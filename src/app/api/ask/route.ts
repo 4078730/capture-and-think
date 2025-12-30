@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     const { query, bucket } = parsed.data;
 
-    // Search for relevant items
+    // まず全アイテムを取得（最新20件）
     let searchQuery = supabase
       .from("items")
       .select("*")
@@ -40,20 +40,9 @@ export async function POST(request: NextRequest) {
       searchQuery = searchQuery.eq("bucket", bucket);
     }
 
-    // Try to find items matching the query
-    const keywords = query
-      .split(/\s+/)
-      .filter((k) => k.length > 1)
-      .slice(0, 5);
-
-    if (keywords.length > 0) {
-      const orConditions = keywords
-        .map((k) => `body.ilike.%${k}%,summary.ilike.%${k}%`)
-        .join(",");
-      searchQuery = searchQuery.or(orConditions);
-    }
-
     const { data: items, error } = await searchQuery;
+
+    console.log(`Ask: found ${items?.length ?? 0} items for query: ${query}`);
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

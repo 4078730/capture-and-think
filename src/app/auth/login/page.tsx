@@ -1,8 +1,34 @@
 "use client";
 
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage("");
+
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
+    });
+
+    if (error) {
+      setMessage(`エラー: ${error.message}`);
+    } else {
+      setMessage("メールを送信しました。リンクをクリックしてログインしてください。");
+    }
+    setLoading(false);
+  };
+
   const handleGoogleLogin = async () => {
     const supabase = createClient();
     await supabase.auth.signInWithOAuth({
@@ -23,6 +49,39 @@ export default function LoginPage() {
           <p className="mt-2 text-[var(--muted-foreground)]">
             思いついた瞬間を逃さない
           </p>
+        </div>
+
+        <form onSubmit={handleEmailLogin} className="space-y-4">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="メールアドレス"
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
+          >
+            {loading ? "送信中..." : "メールでログイン"}
+          </button>
+        </form>
+
+        {message && (
+          <p className="text-center text-sm text-[var(--muted-foreground)]">
+            {message}
+          </p>
+        )}
+
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-gray-300"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-2 bg-[var(--background)] text-[var(--muted-foreground)]">または</span>
+          </div>
         </div>
 
         <button
