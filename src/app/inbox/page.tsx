@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search, Star, ChevronDown, Settings, ArrowUpDown, Calendar, Clock, Tag } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -8,11 +8,13 @@ import { ResponsiveLayout } from "@/components/responsive-layout";
 import { BucketSelector } from "@/components/bucket-selector";
 import { ItemCard } from "@/components/item-card";
 import { ItemModal } from "@/components/item-modal";
+import { NoteDetailView } from "@/components/note-detail";
 import { SwipeableItem } from "@/components/swipeable-item";
 import { ArchiveCandidatesBanner } from "@/components/archive-candidates-banner";
 import { SkeletonList } from "@/components/skeleton-card";
 import { useItems, usePinItem, useArchiveItem, useUpdateItem, useCategories } from "@/hooks/use-items";
 import type { Bucket, Item, Subtask } from "@/types";
+import type { ADFDocument } from "@/lib/adf";
 import { cn } from "@/lib/utils";
 
 type SortOption = "newest" | "oldest" | "due_date" | "pinned_first" | "bucket";
