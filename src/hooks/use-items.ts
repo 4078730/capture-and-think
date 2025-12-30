@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Item, ItemsResponse, Bucket, CreateItemInput, Subtask } from "@/types";
+import type { ADFDocument } from "@/lib/adf";
 
 interface UseItemsOptions {
   status?: "active" | "archived";
@@ -60,6 +61,8 @@ interface UpdateItemData {
   memo?: string;
   due_date?: string | null;
   subtasks?: Subtask[];
+  summary?: string | null;
+  adf_content?: ADFDocument | null;
 }
 
 export function useUpdateItem() {

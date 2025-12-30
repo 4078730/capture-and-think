@@ -1,47 +1,110 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handlePasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage("");
 
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const supabase = createClient();
 
-    if (error) {
-      setMessage(`エラー: ${error.message}`);
-    } else {
-      setMessage("メールを送信しました。リンクをクリックしてログインしてください。");
+      if (isSignUp) {
+        // Sign up with password
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
+          },
+        });
+        if (error) {
+          setMessage(`エラー: ${error.message}`);
+        } else {
+          setMessage("確認メールを送信しました。メールを確認してください。");
+        }
+      } else {
+        // Sign in with password
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) {
+          setMessage(`エラー: ${error.message}`);
+        } else {
+          router.push("/");
+        }
+      }
+    } catch (err) {
+      console.error("Auth exception:", err);
+      setMessage(`エラー: ${err instanceof Error ? err.message : "不明なエラー"}`);
+    }
+    setLoading(false);
+  };
+
+  const handleOtpLogin = async () => {
+    if (!email) {
+      setMessage("メールアドレスを入力してください");
+      return;
+    }
+    setLoading(true);
+    setMessage("");
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+
+      if (error) {
+        console.error("OTP login error:", error);
+        setMessage(`エラー: ${error.message}`);
+      } else {
+        setMessage("ログインリンクを送信しました。メールを確認してください。");
+      }
+    } catch (err) {
+      console.error("OTP login exception:", err);
+      setMessage(`エラー: ${err instanceof Error ? err.message : "不明なエラー"}`);
     }
     setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
-    const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        console.error("Google login error:", error);
+        setMessage(`エラー: ${error.message}`);
+      }
+    } catch (err) {
+      console.error("Google login exception:", err);
+      setMessage(`エラー: ${err instanceof Error ? err.message : "不明なエラー"}`);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-sm space-y-8">
+      <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
             Capture & Think
@@ -51,26 +114,53 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <form onSubmit={handleEmailLogin} className="space-y-4">
+        <form onSubmit={handlePasswordAuth} className="space-y-4">
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="メールアドレス"
             required
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+          />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="パスワード"
+            required
+            minLength={6}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
           />
           <button
             type="submit"
             disabled={loading}
             className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
           >
-            {loading ? "送信中..." : "メールでログイン"}
+            {loading ? "処理中..." : isSignUp ? "アカウント作成" : "ログイン"}
           </button>
         </form>
 
+        <div className="flex justify-between text-sm">
+          <button
+            type="button"
+            onClick={() => setIsSignUp(!isSignUp)}
+            className="text-blue-500 hover:underline"
+          >
+            {isSignUp ? "ログインに戻る" : "アカウント作成"}
+          </button>
+          <button
+            type="button"
+            onClick={handleOtpLogin}
+            disabled={loading}
+            className="text-blue-500 hover:underline disabled:opacity-50"
+          >
+            メールリンクでログイン
+          </button>
+        </div>
+
         {message && (
-          <p className="text-center text-sm text-[var(--muted-foreground)]">
+          <p className={`text-center text-sm ${message.includes("エラー") ? "text-red-500" : "text-green-600"}`}>
             {message}
           </p>
         )}
@@ -85,6 +175,7 @@ export default function LoginPage() {
         </div>
 
         <button
+          type="button"
           onClick={handleGoogleLogin}
           className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
         >

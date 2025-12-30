@@ -3,10 +3,17 @@ import { createClient } from "@/lib/supabase/server";
 import { parseInput } from "@/lib/parser";
 import { z } from "zod";
 
+const adfDocumentSchema = z.object({
+  version: z.literal(1),
+  type: z.literal("doc"),
+  content: z.array(z.any()),
+});
+
 const createItemSchema = z.object({
   body: z.string().min(1),
   bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
   source: z.string().optional(),
+  adf_content: adfDocumentSchema.nullable().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -39,6 +46,7 @@ export async function POST(request: NextRequest) {
         pinned,
         source: parsed.data.source ?? "pwa",
         triage_state: "pending",
+        adf_content: parsed.data.adf_content ?? null,
       })
       .select()
       .single();

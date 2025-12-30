@@ -1,3 +1,5 @@
+import type { ADFDocument } from "@/lib/adf";
+
 export type Bucket = "work" | "video" | "life" | "boardgame";
 export type Kind = "idea" | "task" | "note" | "reference" | "unknown";
 export type Status = "active" | "archived";
@@ -41,6 +43,8 @@ export interface Item {
   ai_confidence: number | null;
   // Calendar sync
   google_calendar_event_id: string | null;
+  // Rich text content (ADF format)
+  adf_content: ADFDocument | null;
 }
 
 export interface CreateItemInput {
@@ -50,6 +54,7 @@ export interface CreateItemInput {
   source?: Source;
   memo?: string;
   due_date?: string;
+  adf_content?: ADFDocument;
 }
 
 export interface UpdateItemInput {
@@ -59,6 +64,7 @@ export interface UpdateItemInput {
   memo?: string;
   due_date?: string | null;
   subtasks?: Subtask[];
+  adf_content?: ADFDocument | null;
 }
 
 export interface ParsedInput {
@@ -74,6 +80,10 @@ export interface TriageResult {
   summary: string;
   auto_tags: string[];
   confidence: number;
+  // Enhanced fields
+  enhanced_title?: string;
+  enhanced_body?: string;
+  extracted_references?: string[];
 }
 
 export interface AskResponse {

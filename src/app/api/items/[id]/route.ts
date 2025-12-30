@@ -9,6 +9,12 @@ const subtaskSchema = z.object({
   created_at: z.string(),
 });
 
+const adfDocumentSchema = z.object({
+  version: z.literal(1),
+  type: z.literal("doc"),
+  content: z.array(z.any()),
+});
+
 const updateItemSchema = z.object({
   body: z.string().min(1).optional(),
   bucket: z.enum(["work", "video", "life", "boardgame"]).nullable().optional(),
@@ -16,6 +22,8 @@ const updateItemSchema = z.object({
   memo: z.string().optional(),
   due_date: z.string().nullable().optional(),
   subtasks: z.array(subtaskSchema).optional(),
+  summary: z.string().nullable().optional(),
+  adf_content: adfDocumentSchema.nullable().optional(),
 });
 
 export async function GET(

@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { TriageResult } from "@/types";
+import type { TriageResult, Item } from "@/types";
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -47,6 +47,57 @@ bucket（指定あれば）: {bucket}
   "confidence": 0.92
 }`;
 
+// Enhanced triage prompt with context and better task writing
+const ENHANCED_TRIAGE_PROMPT = `あなたはメモ・タスク管理のエキスパートアシスタントです。
+ユーザーの入力を分析し、整理されたタスク/メモに変換してください。
+
+## ユーザーのコンテキスト
+{context}
+
+## 入力メモ
+{body}
+
+## bucket指定
+{bucket}
+
+## タスク
+入力を分析し、以下を行ってください：
+
+1. **分類**: 適切なbucket, category, kindを判定
+2. **タイトル整理**: 入力が長文や曖昧な場合、わかりやすいタイトルを作成
+3. **内容整理**: 内容を構造化（必要ならポイントをまとめる）
+4. **URL整理**: 入力内のURLを抽出してリスト化
+
+### bucket分類ルール
+- work: 仕事関連（RFA、ロボット、技術など）
+- video: 動画制作関連（ネタ、演出、編集など）
+- life: 生活全般（観たい、買いたい、映画、本など）
+- boardgame: ボードゲーム関連
+
+### kind分類ルール
+- task: 具体的なアクションが必要なもの（〜する、〜を確認）
+- idea: アイデア、企画、やりたいこと（〜したい、〜はどうか）
+- note: 情報、メモ、学んだこと（〜について、〜とは）
+- reference: 参照用（観たい映画、読みたい本、参考URL）
+
+## 出力形式（JSONのみ）
+{
+  "bucket": "video",
+  "category": "動画ネタ",
+  "kind": "idea",
+  "summary": "15文字程度の要約",
+  "auto_tags": ["タグ1", "タグ2"],
+  "confidence": 0.9,
+  "enhanced_title": "わかりやすいタイトル（30文字以内）",
+  "enhanced_body": "整理された内容（元の情報を保持しつつ読みやすく）",
+  "extracted_references": ["https://example.com"]
+}
+
+注意:
+- enhanced_titleは入力がすでに明確なら元のままでOK
+- enhanced_bodyは入力が短い場合は元のままでOK
+- extracted_referencesはURLがない場合は空配列`;
+
 export async function triageItem(
   body: string,
   bucket: string | null
@@ -74,6 +125,58 @@ export async function triageItem(
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error("Failed to parse triage response");
+  }
+
+  const result = JSON.parse(jsonMatch[0]) as TriageResult;
+
+  // If bucket was already specified, preserve it
+  if (bucket) {
+    result.bucket = bucket as TriageResult["bucket"];
+  }
+
+  return result;
+}
+
+// Enhanced triage with context awareness
+export async function triageItemWithContext(
+  body: string,
+  bucket: string | null,
+  recentItems: Pick<Item, "body" | "bucket" | "category" | "kind">[]
+): Promise<TriageResult> {
+  // Build context from recent items
+  let context = "最近のタスク/メモ:\n";
+  if (recentItems.length > 0) {
+    context += recentItems
+      .slice(0, 10)
+      .map((item) => `- [${item.bucket || "未分類"}/${item.category || "未分類"}] ${item.body.slice(0, 50)}`)
+      .join("\n");
+  } else {
+    context = "（既存のタスクなし - 初回利用）";
+  }
+
+  const prompt = ENHANCED_TRIAGE_PROMPT
+    .replace("{body}", body)
+    .replace("{bucket}", bucket ?? "未指定")
+    .replace("{context}", context);
+
+  const response = await client.messages.create({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 1000,
+    messages: [
+      {
+        role: "user",
+        content: prompt,
+      },
+    ],
+  });
+
+  const text =
+    response.content[0].type === "text" ? response.content[0].text : "";
+
+  // Extract JSON from response
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error("Failed to parse enhanced triage response");
   }
 
   const result = JSON.parse(jsonMatch[0]) as TriageResult;
