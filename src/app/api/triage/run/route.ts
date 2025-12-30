@@ -2,18 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { triageItem } from "@/lib/ai/triage";
 
+// Vercel Cron calls GET
+export async function GET(request: NextRequest) {
+  // Verify cron secret for security
+  const authHeader = request.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Allow if no CRON_SECRET is set (for development)
+    if (process.env.CRON_SECRET) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
+
+  return runTriage();
+}
+
 export async function POST(request: NextRequest) {
+  // Get item_ids from body if provided
+  let itemIds: string[] | undefined;
+  try {
+    const json = await request.json();
+    itemIds = json.item_ids;
+  } catch {
+    // No body provided, process all pending
+  }
+
+  return runTriage(itemIds);
+}
+
+async function runTriage(itemIds?: string[]) {
   try {
     const supabase = await createServiceClient();
-
-    // Get item_ids from body if provided
-    let itemIds: string[] | undefined;
-    try {
-      const json = await request.json();
-      itemIds = json.item_ids;
-    } catch {
-      // No body provided, process all pending
-    }
 
     // Query for pending items
     let query = supabase
