@@ -8,15 +8,22 @@ interface ItemCardProps {
   item: Item;
   onPin: (id: string, pinned: boolean) => void;
   onArchive: (id: string) => void;
+  onClick?: (item: Item) => void;
 }
 
-export function ItemCard({ item, onPin, onArchive }: ItemCardProps) {
+export function ItemCard({ item, onPin, onArchive, onClick }: ItemCardProps) {
   return (
-    <div className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4 hover:border-[var(--primary)] transition-colors">
+    <div
+      className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4 hover:border-[var(--primary)] transition-colors cursor-pointer"
+      onClick={() => onClick?.(item)}
+    >
       <div className="flex items-start gap-3">
         <button
           type="button"
-          onClick={() => onPin(item.id, !item.pinned)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onPin(item.id, !item.pinned);
+          }}
           className={cn(
             "mt-0.5 transition-colors",
             item.pinned
@@ -54,7 +61,10 @@ export function ItemCard({ item, onPin, onArchive }: ItemCardProps) {
 
         <button
           type="button"
-          onClick={() => onArchive(item.id)}
+          onClick={(e) => {
+            e.stopPropagation();
+            onArchive(item.id);
+          }}
           className="text-[var(--muted-foreground)] hover:text-[var(--destructive)] transition-colors"
         >
           <Archive className="w-5 h-5" />

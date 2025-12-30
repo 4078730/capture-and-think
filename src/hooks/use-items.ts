@@ -108,3 +108,55 @@ export function useArchiveItem() {
     },
   });
 }
+
+interface Category {
+  name: string;
+  count: number;
+}
+
+export function useCategories(bucket?: Bucket | null) {
+  const params = new URLSearchParams();
+  if (bucket) params.set("bucket", bucket);
+
+  return useQuery<{ categories: Category[] }>({
+    queryKey: ["categories", bucket],
+    queryFn: async () => {
+      const res = await fetch(`/api/categories?${params}`);
+      if (!res.ok) throw new Error("Failed to fetch categories");
+      return res.json();
+    },
+  });
+}
+
+export function useArchiveCandidates() {
+  return useQuery<{ items: Item[]; total: number }>({
+    queryKey: ["archive-candidates"],
+    queryFn: async () => {
+      const res = await fetch("/api/archive-candidates");
+      if (!res.ok) throw new Error("Failed to fetch archive candidates");
+      return res.json();
+    },
+  });
+}
+
+export function useBulkArchive() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = await Promise.all(
+        ids.map((id) =>
+          fetch(`/api/items/${id}/archive`, { method: "POST" })
+        )
+      );
+      const failed = results.filter((r) => !r.ok);
+      if (failed.length > 0) {
+        throw new Error(`Failed to archive ${failed.length} items`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+      queryClient.invalidateQueries({ queryKey: ["archive-candidates"] });
+    },
+  });
+}
