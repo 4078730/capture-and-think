@@ -1,8 +1,16 @@
 export type Bucket = "work" | "video" | "life" | "boardgame";
 export type Kind = "idea" | "task" | "note" | "reference" | "unknown";
 export type Status = "active" | "archived";
-export type TriageState = "pending" | "done" | "failed";
-export type Source = "pwa" | "widget" | "claude" | "chatgpt" | "browser";
+export type TriageState = "pending" | "awaiting_approval" | "done" | "failed";
+export type Source = "pwa" | "widget" | "claude" | "chatgpt" | "browser" | "mcp";
+
+// Subtask for checklist items
+export interface Subtask {
+  id: string;
+  text: string;
+  completed: boolean;
+  created_at: string;
+}
 
 export interface Item {
   id: string;
@@ -20,6 +28,19 @@ export interface Item {
   source: Source | null;
   created_at: string;
   updated_at: string;
+  // New fields
+  memo: string | null;
+  subtasks: Subtask[];
+  due_date: string | null;
+  // AI suggestions (before approval)
+  ai_suggested_bucket: Bucket | null;
+  ai_suggested_category: string | null;
+  ai_suggested_kind: Kind | null;
+  ai_suggested_summary: string | null;
+  ai_suggested_tags: string[];
+  ai_confidence: number | null;
+  // Calendar sync
+  google_calendar_event_id: string | null;
 }
 
 export interface CreateItemInput {
@@ -27,12 +48,17 @@ export interface CreateItemInput {
   bucket?: Bucket;
   pinned?: boolean;
   source?: Source;
+  memo?: string;
+  due_date?: string;
 }
 
 export interface UpdateItemInput {
   body?: string;
-  bucket?: Bucket;
+  bucket?: Bucket | null;
   pinned?: boolean;
+  memo?: string;
+  due_date?: string | null;
+  subtasks?: Subtask[];
 }
 
 export interface ParsedInput {
@@ -70,4 +96,32 @@ export interface ItemsResponse {
   total: number;
   limit: number;
   offset: number;
+}
+
+// API Key for MCP authentication
+export interface ApiKey {
+  id: string;
+  user_id: string;
+  key_prefix: string;
+  name: string;
+  last_used_at: string | null;
+  created_at: string;
+  expires_at: string | null;
+}
+
+// User settings
+export interface UserSettings {
+  id: string;
+  user_id: string;
+  google_calendar_enabled: boolean;
+  google_calendar_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// Due items grouped by urgency
+export interface DueItemsResponse {
+  overdue: Item[];
+  today: Item[];
+  upcoming: Item[];
 }

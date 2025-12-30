@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, Star, Loader2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Navigation } from "@/components/navigation";
@@ -9,6 +9,7 @@ import { ItemCard } from "@/components/item-card";
 import { ItemModal } from "@/components/item-modal";
 import { SwipeableItem } from "@/components/swipeable-item";
 import { ArchiveCandidatesBanner } from "@/components/archive-candidates-banner";
+import { SkeletonList } from "@/components/skeleton-card";
 import { useItems, usePinItem, useArchiveItem, useUpdateItem, useCategories } from "@/hooks/use-items";
 import type { Bucket, Item } from "@/types";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,12 @@ export default function InboxPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
 
   // Debounce search
-  useState(() => {
+  useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 300);
     return () => clearTimeout(timer);
-  });
+  }, [search]);
 
   const { data: categoriesData } = useCategories(bucket);
   const categories = categoriesData?.categories ?? [];
@@ -141,9 +142,7 @@ export default function InboxPage() {
         <ArchiveCandidatesBanner />
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-[var(--muted-foreground)]" />
-          </div>
+          <SkeletonList count={5} />
         ) : error ? (
           <div className="text-center py-12 text-[var(--muted-foreground)]">
             エラーが発生しました
