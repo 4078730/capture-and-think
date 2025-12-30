@@ -22,10 +22,24 @@ export function VersionFooter() {
 
   if (!data) return null;
 
+  const formatDate = (dateStr: string) => {
+    try {
+      const date = new Date(dateStr);
+      return date.toLocaleString("ja-JP", {
+        month: "numeric",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    } catch {
+      return "";
+    }
+  };
+
   return (
     <div className="fixed bottom-20 left-0 right-0 flex justify-center pointer-events-none">
       <span className="text-[10px] text-[var(--muted-foreground)] opacity-40">
-        v{data.version} ({data.commit})
+        v{data.version} ({data.commit}) - {formatDate(data.deployedAt)}
       </span>
     </div>
   );
