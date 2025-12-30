@@ -61,17 +61,17 @@ async function runTriage(itemIds?: string[]) {
       try {
         const result = await triageItem(item.body, item.bucket);
 
+        // Store AI suggestions for user approval (don't apply yet)
         await supabase
           .from("items")
           .update({
-            bucket: result.bucket,
-            category: result.category,
-            kind: result.kind,
-            summary: result.summary,
-            auto_tags: result.auto_tags,
-            confidence: result.confidence,
-            triage_state: "done",
-            triaged_at: new Date().toISOString(),
+            ai_suggested_bucket: result.bucket,
+            ai_suggested_category: result.category,
+            ai_suggested_kind: result.kind,
+            ai_suggested_summary: result.summary,
+            ai_suggested_tags: result.auto_tags,
+            ai_confidence: result.confidence,
+            triage_state: "awaiting_approval",
           })
           .eq("id", item.id);
 
