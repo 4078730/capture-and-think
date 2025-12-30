@@ -40,10 +40,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   // Protected routes
-  const protectedPaths = ["/", "/inbox", "/ask"];
-  const isProtectedPath = protectedPaths.some(
-    (path) => request.nextUrl.pathname === path || request.nextUrl.pathname.startsWith("/api/")
+  const protectedPaths = ["/", "/inbox", "/ask", "/review", "/settings"];
+  const publicApiPaths = ["/api/triage", "/api/version", "/api/mcp"];
+
+  const isPublicApi = publicApiPaths.some((path) =>
+    request.nextUrl.pathname.startsWith(path)
   );
+  const isProtectedPath = protectedPaths.some(
+    (path) => request.nextUrl.pathname === path
+  ) || (request.nextUrl.pathname.startsWith("/api/") && !isPublicApi);
 
   if (isProtectedPath && !user && !request.nextUrl.pathname.startsWith("/auth")) {
     const url = request.nextUrl.clone();
