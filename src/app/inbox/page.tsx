@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Star, Loader2, ChevronDown } from "lucide-react";
+import { Search, Star, ChevronDown, Settings } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Navigation } from "@/components/navigation";
 import { BucketSelector } from "@/components/bucket-selector";
@@ -11,7 +12,7 @@ import { SwipeableItem } from "@/components/swipeable-item";
 import { ArchiveCandidatesBanner } from "@/components/archive-candidates-banner";
 import { SkeletonList } from "@/components/skeleton-card";
 import { useItems, usePinItem, useArchiveItem, useUpdateItem, useCategories } from "@/hooks/use-items";
-import type { Bucket, Item } from "@/types";
+import type { Bucket, Item, Subtask } from "@/types";
 import { cn } from "@/lib/utils";
 
 export default function InboxPage() {
@@ -76,15 +77,31 @@ export default function InboxPage() {
     }
   };
 
-  const handleUpdate = async (id: string, data: { body?: string; bucket?: Bucket | null }) => {
+  const handleUpdate = async (
+    id: string,
+    data: {
+      body?: string;
+      bucket?: Bucket | null;
+      memo?: string;
+      due_date?: string | null;
+      subtasks?: Subtask[];
+    }
+  ) => {
     await updateItem.mutateAsync({ id, ...data });
   };
 
   return (
     <div className="min-h-screen flex flex-col">
       <header className="sticky top-0 z-10 bg-[var(--background)] border-b border-[var(--border)]">
-        <div className="flex items-center justify-center h-14">
-          <h1 className="text-lg font-semibold">Inbox</h1>
+        <div className="flex items-center h-14 px-4">
+          <div className="w-10" /> {/* Spacer for centering */}
+          <h1 className="flex-1 text-lg font-semibold text-center">Inbox</h1>
+          <Link
+            href="/settings"
+            className="p-2 -mr-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--secondary)] rounded-lg transition-colors"
+          >
+            <Settings className="w-5 h-5" />
+          </Link>
         </div>
 
         <div className="p-4 space-y-3">
@@ -152,18 +169,21 @@ export default function InboxPage() {
             アイテムがありません
           </div>
         ) : (
-          data?.items.map((item) => (
-            <SwipeableItem
+          data?.items.map((item, index) => (
+            <div
               key={item.id}
-              onSwipeLeft={() => handleArchive(item.id)}
+              className="animate-fade-in-up"
+              style={{ animationDelay: `${Math.min(index * 0.03, 0.3)}s`, animationFillMode: "both" }}
             >
-              <ItemCard
-                item={item}
-                onPin={handlePin}
-                onArchive={handleArchive}
-                onClick={setSelectedItem}
-              />
-            </SwipeableItem>
+              <SwipeableItem onSwipeLeft={() => handleArchive(item.id)}>
+                <ItemCard
+                  item={item}
+                  onPin={handlePin}
+                  onArchive={handleArchive}
+                  onClick={setSelectedItem}
+                />
+              </SwipeableItem>
+            </div>
           ))
         )}
 

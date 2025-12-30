@@ -2,6 +2,8 @@
 
 import { Star, Archive } from "lucide-react";
 import { cn, formatRelativeTime, getBucketColor, truncateText } from "@/lib/utils";
+import { DueDateBadge } from "./due-date-picker";
+import { SubtaskProgress } from "./subtask-list";
 import type { Item } from "@/types";
 
 interface ItemCardProps {
@@ -14,7 +16,7 @@ interface ItemCardProps {
 export function ItemCard({ item, onPin, onArchive, onClick }: ItemCardProps) {
   return (
     <div
-      className="bg-[var(--background)] border border-[var(--border)] rounded-lg p-4 hover:border-[var(--primary)] transition-colors cursor-pointer"
+      className="bg-[var(--card)] border border-[var(--border)] rounded-xl p-4 card-hover cursor-pointer touch-feedback"
       onClick={() => onClick?.(item)}
     >
       <div className="flex items-start gap-3">
@@ -55,6 +57,8 @@ export function ItemCard({ item, onPin, onArchive, onClick }: ItemCardProps) {
                 {item.category}
               </span>
             )}
+            <DueDateBadge dueDate={item.due_date} />
+            <SubtaskProgress subtasks={item.subtasks} />
             <span>{formatRelativeTime(item.created_at)}</span>
           </div>
         </div>

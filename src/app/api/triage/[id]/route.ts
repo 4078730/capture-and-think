@@ -21,8 +21,8 @@ export async function POST(
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    // Skip if already done
-    if (item.triage_state === "done") {
+    // Skip if already processed
+    if (item.triage_state === "done" || item.triage_state === "awaiting_approval") {
       return NextResponse.json({ message: "Already triaged" });
     }
 
@@ -30,18 +30,17 @@ export async function POST(
       // Run triage
       const result = await triageItem(item.body, item.bucket);
 
-      // Update item with triage results
+      // Store AI suggestions for user approval (don't apply yet)
       const { error: updateError } = await supabase
         .from("items")
         .update({
-          bucket: result.bucket,
-          category: result.category,
-          kind: result.kind,
-          summary: result.summary,
-          auto_tags: result.auto_tags,
-          confidence: result.confidence,
-          triage_state: "done",
-          triaged_at: new Date().toISOString(),
+          ai_suggested_bucket: result.bucket,
+          ai_suggested_category: result.category,
+          ai_suggested_kind: result.kind,
+          ai_suggested_summary: result.summary,
+          ai_suggested_tags: result.auto_tags,
+          ai_confidence: result.confidence,
+          triage_state: "awaiting_approval",
         })
         .eq("id", id);
 
@@ -49,7 +48,7 @@ export async function POST(
         throw updateError;
       }
 
-      return NextResponse.json({ success: true, result });
+      return NextResponse.json({ success: true, result, awaiting_approval: true });
     } catch (triageError) {
       // Mark as failed
       await supabase

@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
       .select("*", { count: "exact" })
       .eq("user_id", user.id)
       .eq("status", status)
+      .eq("triage_state", "done") // Only show approved items in inbox
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 

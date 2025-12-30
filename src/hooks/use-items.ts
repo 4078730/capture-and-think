@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Item, ItemsResponse, Bucket, CreateItemInput } from "@/types";
+import type { Item, ItemsResponse, Bucket, CreateItemInput, Subtask } from "@/types";
 
 interface UseItemsOptions {
   status?: "active" | "archived";
@@ -52,14 +52,21 @@ export function useCreateItem() {
   });
 }
 
+interface UpdateItemData {
+  id: string;
+  body?: string;
+  bucket?: Bucket | null;
+  pinned?: boolean;
+  memo?: string;
+  due_date?: string | null;
+  subtasks?: Subtask[];
+}
+
 export function useUpdateItem() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      id,
-      ...data
-    }: { id: string; body?: string; bucket?: Bucket | null; pinned?: boolean }) => {
+    mutationFn: async ({ id, ...data }: UpdateItemData) => {
       const res = await fetch(`/api/items/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 
+const subtaskSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  completed: z.boolean(),
+  created_at: z.string(),
+});
+
 const updateItemSchema = z.object({
   body: z.string().min(1).optional(),
   bucket: z.enum(["work", "video", "life", "boardgame"]).nullable().optional(),
   pinned: z.boolean().optional(),
+  memo: z.string().optional(),
+  due_date: z.string().nullable().optional(),
+  subtasks: z.array(subtaskSchema).optional(),
 });
 
 export async function GET(
