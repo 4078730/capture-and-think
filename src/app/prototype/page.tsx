@@ -2841,14 +2841,14 @@ export default function PrototypePage() {
         </div>
 
         {/* Version Footer */}
-        <footer className="px-5 lg:px-6 py-4 border-t border-white/[0.04] mt-8">
-          <div className="text-[10px] text-white/20 space-y-1">
-            <div className="flex items-center gap-2">
-              <span>Build: {process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleString("ja-JP") : "dev"}</span>
-              <span className="text-white/10">|</span>
-              <span className="font-mono">{process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || "local"}</span>
+        <footer className="px-5 lg:px-6 py-3 border-t border-white/[0.06] mt-8 bg-black/20">
+          <div className="text-[11px] text-white/30 space-y-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono bg-white/[0.05] px-1.5 py-0.5 rounded">{process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || "local"}</span>
+              <span className="text-white/20">•</span>
+              <span>{process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleString("ja-JP") : "dev"}</span>
             </div>
-            <div className="text-white/15 truncate max-w-md">
+            <div className="text-white/25 truncate">
               {process.env.NEXT_PUBLIC_GIT_COMMIT_MESSAGE || "Development mode"}
             </div>
           </div>
