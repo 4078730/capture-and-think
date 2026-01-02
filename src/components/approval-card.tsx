@@ -6,7 +6,6 @@ import type { Item, Bucket, Kind } from "@/types";
 import { cn } from "@/lib/utils";
 
 const bucketLabels: Record<Bucket, string> = {
-  work: "仕事",
   management: "管理",
   rfa: "RFA",
   cxc: "CXC",
