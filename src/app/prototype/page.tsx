@@ -2839,6 +2839,20 @@ export default function PrototypePage() {
             </button>
           </div>
         </div>
+
+        {/* Version Footer */}
+        <footer className="px-5 lg:px-6 py-4 border-t border-white/[0.04] mt-8">
+          <div className="text-[10px] text-white/20 space-y-1">
+            <div className="flex items-center gap-2">
+              <span>Build: {process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleString("ja-JP") : "dev"}</span>
+              <span className="text-white/10">|</span>
+              <span className="font-mono">{process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || "local"}</span>
+            </div>
+            <div className="text-white/15 truncate max-w-md">
+              {process.env.NEXT_PUBLIC_GIT_COMMIT_MESSAGE || "Development mode"}
+            </div>
+          </div>
+        </footer>
       </main>
 
       {/* Search modal */}
