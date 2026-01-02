@@ -3057,7 +3057,7 @@ export default function PrototypePage() {
       <main className="lg:pl-64 min-h-screen lg:flex">
         {/* List Panel */}
         <div className={cn(
-          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col min-h-screen",
+          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col h-screen overflow-hidden",
           isDesktop && selectedNote && "hidden lg:flex"
         )}>
           <header className="sticky top-0 z-10 px-4 lg:px-5 py-4 bg-[#09090b]/80 backdrop-blur-2xl border-b border-white/[0.04]">
@@ -3216,7 +3216,7 @@ export default function PrototypePage() {
 
         {/* Detail Panel - Desktop Only */}
         {isDesktop && (
-          <div className="flex-1 flex flex-col min-h-screen bg-[#0c0c0e]">
+          <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0c0c0e]">
             {selectedNote ? (
               <>
                 {/* Editor Header */}
@@ -3285,8 +3285,8 @@ export default function PrototypePage() {
                 </header>
 
                 {/* Editor Content */}
-                <div className="flex-1 overflow-y-auto">
-                  <div className="max-w-3xl mx-auto px-8 py-8">
+                <div className="flex-1 overflow-y-auto bg-[#0c0c0e]">
+                  <div className="max-w-3xl mx-auto px-8 py-8 min-h-[200px]">
                     {/* Title */}
                     <input
                       type="text"
