@@ -2889,19 +2889,19 @@ export default function PrototypePage() {
         <div className="h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent my-5" />
 
         {/* Tasks Section - Hierarchical */}
-        <div className="flex-1 min-h-0 flex flex-col">
-          <div className="flex items-center justify-between px-3 mb-2">
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-3 mb-2 flex-shrink-0">
             <span className="text-[11px] font-semibold text-white/30 uppercase tracking-widest">Tasks</span>
             <span className="text-[11px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full font-medium">{incompleteTasks.length}</span>
           </div>
 
           {/* タスク追加ボタン */}
-          <button className="mx-2 mb-2 flex items-center gap-2 px-3 py-2 text-[12px] text-white/30 hover:text-white/60 hover:bg-white/[0.03] rounded-lg transition-all border border-dashed border-white/[0.06] hover:border-white/[0.12]">
+          <button className="mx-2 mb-2 flex-shrink-0 flex items-center gap-2 px-3 py-2 text-[12px] text-white/30 hover:text-white/60 hover:bg-white/[0.03] rounded-lg transition-all border border-dashed border-white/[0.06] hover:border-white/[0.12]">
             <Plus className="w-3.5 h-3.5" />
             <span>タスクを追加</span>
           </button>
 
-          <div className="flex-1 overflow-y-auto space-y-0.5 px-1">
+          <div className="flex-1 overflow-y-auto space-y-0.5 px-1 min-h-0">
             {/* Root tasks only in sidebar */}
             {getRootTasks(tasks).filter(t => !t.completed).map(task => {
               const relatedNote = notes.find(n => n.id === task.noteId);
@@ -3018,7 +3018,7 @@ export default function PrototypePage() {
         </div>
 
         {/* Settings Section */}
-        <div className="border-t border-white/[0.04] pt-4 mt-4">
+        <div className="border-t border-white/[0.04] pt-4 mt-4 flex-shrink-0">
           <p className="text-[10px] text-white/25 uppercase tracking-widest px-3 mb-2 font-medium">Settings</p>
           <div className="space-y-0.5">
             <button
@@ -3054,10 +3054,10 @@ export default function PrototypePage() {
       </aside>
 
       {/* Main - 3 Column Layout on Desktop */}
-      <main className="lg:pl-64 min-h-screen lg:flex">
+      <main className="lg:pl-64 h-screen lg:flex overflow-hidden">
         {/* List Panel */}
         <div className={cn(
-          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col h-screen overflow-hidden",
+          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col h-full",
           isDesktop && selectedNote && "hidden lg:flex"
         )}>
           <header className="sticky top-0 z-10 px-4 lg:px-5 py-4 bg-[#09090b]/80 backdrop-blur-2xl border-b border-white/[0.04]">
@@ -3216,7 +3216,7 @@ export default function PrototypePage() {
 
         {/* Detail Panel - Desktop Only */}
         {isDesktop && (
-          <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#0c0c0e]">
+          <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0c0c0e]">
             {selectedNote ? (
               <>
                 {/* Editor Header */}
