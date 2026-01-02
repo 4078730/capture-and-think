@@ -1444,6 +1444,9 @@ function HierarchicalTaskItem({
 // Map bucket from DB to local color
 const bucketColorMap: Record<string, string> = {
   work: "amber",
+  management: "amber",
+  rfm: "emerald",
+  agent: "violet",
   video: "blue",
   life: "rose",
   boardgame: "cyan",
