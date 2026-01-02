@@ -119,6 +119,23 @@ export function useArchiveItem() {
   });
 }
 
+export function useUnarchiveItem() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/items/${id}/unarchive`, {
+        method: "POST",
+      });
+      if (!res.ok) throw new Error("Failed to unarchive item");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["items"] });
+    },
+  });
+}
+
 interface Category {
   name: string;
   count: number;

@@ -10,7 +10,8 @@ import {
   Save, Clock, ArchiveRestore
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useItems, useUpdateItem, useCreateItem, useArchiveItem, usePinItem } from "@/hooks/use-items";
+import { toast } from "sonner";
+import { useItems, useUpdateItem, useCreateItem, useArchiveItem, useUnarchiveItem, usePinItem } from "@/hooks/use-items";
 import type { Item, Bucket, Subtask } from "@/types";
 
 // Save status type
@@ -1479,6 +1480,7 @@ export default function PrototypePage() {
   const updateItem = useUpdateItem();
   const createItem = useCreateItem();
   const archiveItemMutation = useArchiveItem();
+  const unarchiveItemMutation = useUnarchiveItem();
   const pinItemMutation = usePinItem();
 
   // Convert API items to notes
@@ -1675,22 +1677,42 @@ export default function PrototypePage() {
       });
       const note = itemToNote(newItem);
       handleOpenNote(note);
+      toast.success("新しいノートを作成しました");
     } catch (err) {
       console.error("Create failed:", err);
+      toast.error("ノートの作成に失敗しました");
     }
   }, [createItem, selectedBucket]);
 
-  // アーカイブ/復元
-    const handleArchiveNote = useCallback(async (noteId: string) => {
+  // アーカイブ/復元トグル
+  const handleArchiveNote = useCallback(async (noteId: string, isArchived: boolean) => {
     try {
-      await archiveItemMutation.mutateAsync(noteId);
-      if (selectedNote?.id === noteId) {
-        setSelectedNote(null);
+      if (isArchived) {
+        await unarchiveItemMutation.mutateAsync(noteId);
+        toast.success("アーカイブを解除しました");
+      } else {
+        await archiveItemMutation.mutateAsync(noteId);
+        if (selectedNote?.id === noteId) {
+          setSelectedNote(null);
+        }
+        toast.success("アーカイブしました");
       }
     } catch (err) {
-      console.error("Archive failed:", err);
+      console.error("Archive/Unarchive failed:", err);
+      toast.error("操作に失敗しました");
     }
-  }, [archiveItemMutation, selectedNote]);
+  }, [archiveItemMutation, unarchiveItemMutation, selectedNote]);
+
+  // ピントグル
+  const handlePinNote = useCallback(async (noteId: string, isPinned: boolean) => {
+    try {
+      await pinItemMutation.mutateAsync({ id: noteId, pinned: !isPinned });
+      toast.success(isPinned ? "ピンを解除しました" : "ピン留めしました");
+    } catch (err) {
+      console.error("Pin failed:", err);
+      toast.error("操作に失敗しました");
+    }
+  }, [pinItemMutation]);
 
   // オートセーブ
   useEffect(() => {
@@ -1719,6 +1741,7 @@ export default function PrototypePage() {
       } catch (err) {
         console.error("Save failed:", err);
         setSaveStatus("idle");
+        toast.error("保存に失敗しました");
       }
     }, 500);
 
@@ -2119,7 +2142,7 @@ export default function PrototypePage() {
               <div className="flex items-center gap-1">
                 {/* アーカイブボタン */}
                 <button
-                  onClick={() => handleArchiveNote(selectedNote.id)}
+                  onClick={() => handleArchiveNote(selectedNote.id, selectedNote.archived)}
                   className={cn(
                     "p-2 rounded-lg transition-all",
                     selectedNote.archived ? "text-violet-400 bg-violet-500/10" : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
@@ -2128,10 +2151,14 @@ export default function PrototypePage() {
                 >
                   {selectedNote.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
                 </button>
-                <button className={cn(
-                  "p-2 rounded-lg transition-all",
-                  selectedNote.pinned ? "text-amber-400 bg-amber-500/10" : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
-                )}>
+                <button
+                  onClick={() => handlePinNote(selectedNote.id, selectedNote.pinned)}
+                  className={cn(
+                    "p-2 rounded-lg transition-all",
+                    selectedNote.pinned ? "text-amber-400 bg-amber-500/10" : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
+                  )}
+                  title={selectedNote.pinned ? "ピン解除" : "ピン留め"}
+                >
                   <Pin className="w-4 h-4" />
                 </button>
                 <button className="p-2 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all">
@@ -2763,6 +2790,61 @@ export default function PrototypePage() {
         </header>
 
         <div className="p-5 lg:p-6">
+          {/* Loading State */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4">
+                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
+                <p className="text-white/40 text-sm">読み込み中...</p>
+              </div>
+            </div>
+          )}
+
+          {/* Error State */}
+          {error && (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <X className="w-6 h-6 text-red-400" />
+                </div>
+                <div>
+                  <p className="text-white/60 font-medium">データの読み込みに失敗しました</p>
+                  <p className="text-white/30 text-sm mt-1">ページを更新してください</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !error && filteredNotes.length === 0 && (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center">
+                  <FileText className="w-8 h-8 text-violet-400" />
+                </div>
+                <div>
+                  <p className="text-white/60 font-medium">
+                    {showArchived ? "アーカイブされたノートはありません" : "ノートがありません"}
+                  </p>
+                  <p className="text-white/30 text-sm mt-1">
+                    {showArchived ? "アーカイブにはまだ何もありません" : "新しいノートを作成してみましょう"}
+                  </p>
+                </div>
+                {!showArchived && (
+                  <button
+                    onClick={handleCreateNote}
+                    className="mt-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Plus className="w-4 h-4 inline-block mr-1" />
+                    新規ノート作成
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Notes Grid */}
+          {!isLoading && !error && filteredNotes.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
             {filteredNotes.map((note, index) => {
               const color = colorConfig[note.color] || colorConfig.violet;
@@ -2838,6 +2920,7 @@ export default function PrototypePage() {
               <span className="text-[13px] text-white/25 group-hover:text-violet-400/70 font-medium transition-colors duration-300">New note</span>
             </button>
           </div>
+          )}
         </div>
 
         {/* Version Footer */}
