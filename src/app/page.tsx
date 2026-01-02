@@ -12,7 +12,10 @@ import {
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useItems, useUpdateItem, useCreateItem, useArchiveItem, useUnarchiveItem, usePinItem, useDeleteItem } from "@/hooks/use-items";
-import type { Item, Bucket, Subtask } from "@/types";
+import { createClient } from "@/lib/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Item, Bucket, Subtask, ApiKey } from "@/types";
+import { LogOut, Copy, Eye, EyeOff, Palette, Bell, Shield } from "lucide-react";
 
 // Save status type
 type SaveStatus = "idle" | "saving" | "saved";
@@ -1476,19 +1479,186 @@ interface VersionInfo {
   deployedAt: string;
 }
 
+// Settings API Keys Component
+function SettingsApiKeys() {
+  const queryClient = useQueryClient();
+  const [newKeyName, setNewKeyName] = useState("");
+  const [newlyCreatedKey, setNewlyCreatedKey] = useState<string | null>(null);
+  const [showKey, setShowKey] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const { data, isLoading } = useQuery<{ keys: { id: string; name: string; created_at: string; last_used_at: string | null }[] }>({
+    queryKey: ["api-keys"],
+    queryFn: async () => {
+      const res = await fetch("/api/keys");
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await fetch("/api/keys", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) throw new Error("Failed to create");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      setNewlyCreatedKey(data.key);
+      setNewKeyName("");
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+      toast.success("APIキーを作成しました");
+    },
+    onError: () => {
+      toast.error("作成に失敗しました");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/keys?id=${id}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Failed to delete");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+      toast.success("APIキーを削除しました");
+    },
+    onError: () => {
+      toast.error("削除に失敗しました");
+    },
+  });
+
+  const handleCopy = async (key: string) => {
+    await navigator.clipboard.writeText(key);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("コピーしました");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-[15px] font-semibold text-white/90 mb-2">APIキー管理</h3>
+        <p className="text-[13px] text-white/40 mb-4">
+          ClaudeやChatGPTからこのアプリにアクセスするためのAPIキーを管理します。
+        </p>
+      </div>
+
+      {/* Newly created key */}
+      {newlyCreatedKey && (
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl space-y-3">
+          <p className="text-[13px] text-emerald-400 font-medium">
+            新しいAPIキーが作成されました。このキーは一度しか表示されません。
+          </p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 p-3 bg-black/40 rounded-lg text-[12px] font-mono text-white/70 overflow-x-auto">
+              {showKey ? newlyCreatedKey : "•".repeat(40)}
+            </code>
+            <button
+              onClick={() => setShowKey(!showKey)}
+              className="p-2 text-white/40 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all"
+            >
+              {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={() => handleCopy(newlyCreatedKey)}
+              className="p-2 text-white/40 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all"
+            >
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+            </button>
+          </div>
+          <button
+            onClick={() => setNewlyCreatedKey(null)}
+            className="text-[12px] text-white/40 hover:text-white/60"
+          >
+            閉じる
+          </button>
+        </div>
+      )}
+
+      {/* Create new key */}
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newKeyName}
+          onChange={(e) => setNewKeyName(e.target.value)}
+          placeholder="キー名 (例: Claude Desktop)"
+          className="flex-1 px-4 py-2.5 bg-white/[0.04] border border-white/[0.08] rounded-xl text-[13px] text-white/80 placeholder:text-white/30 focus:outline-none focus:border-violet-500/50"
+        />
+        <button
+          onClick={() => newKeyName.trim() && createMutation.mutate(newKeyName.trim())}
+          disabled={!newKeyName.trim() || createMutation.isPending}
+          className="flex items-center gap-2 px-4 py-2.5 bg-violet-500 hover:bg-violet-400 disabled:opacity-50 text-white rounded-xl text-[13px] font-medium transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          作成
+        </button>
+      </div>
+
+      {/* Key list */}
+      <div className="space-y-2">
+        {isLoading ? (
+          <div className="text-[13px] text-white/40 text-center py-4">読み込み中...</div>
+        ) : data?.keys.length === 0 ? (
+          <div className="text-[13px] text-white/40 text-center py-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+            APIキーがありません
+          </div>
+        ) : (
+          data?.keys.map((key) => (
+            <div
+              key={key.id}
+              className="flex items-center justify-between p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]"
+            >
+              <div>
+                <p className="text-[14px] text-white/80 font-medium">{key.name}</p>
+                <p className="text-[12px] text-white/40">
+                  作成: {new Date(key.created_at).toLocaleDateString("ja-JP")}
+                  {key.last_used_at && (
+                    <> • 最終使用: {new Date(key.last_used_at).toLocaleDateString("ja-JP")}</>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => deleteMutation.mutate(key.id)}
+                disabled={deleteMutation.isPending}
+                className="p-2 text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function PrototypePage() {
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [tasks, setTasks] = useState(mockTasks);
   const [showArchived, setShowArchived] = useState(false);
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<"account" | "apikeys" | "mcp" | "preferences">("account");
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
-  // Fetch version info on mount
+  // Fetch version info and user info on mount
   useEffect(() => {
     fetch("/api/version")
       .then(res => res.json())
       .then(data => setVersionInfo(data))
       .catch(() => {});
+
+    // Get user info
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email || null);
+    });
   }, []);
 
   // API hooks
@@ -2819,20 +2989,31 @@ export default function PrototypePage() {
         <div className="border-t border-white/[0.04] pt-4 mt-4">
           <p className="text-[10px] text-white/25 uppercase tracking-widest px-3 mb-2 font-medium">Settings</p>
           <div className="space-y-0.5">
-            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group">
+            <button
+              onClick={() => { setSettingsTab("account"); setShowSettings(true); }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group"
+            >
               <User className="w-4 h-4" />
               <span className="flex-1 text-left">Account</span>
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group">
+            <button
+              onClick={() => { setSettingsTab("apikeys"); setShowSettings(true); }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group"
+            >
               <Key className="w-4 h-4" />
               <span className="flex-1 text-left">API Keys</span>
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] hover:bg-violet-500/10 transition-all group">
+            <button
+              onClick={() => { setSettingsTab("mcp"); setShowSettings(true); }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] hover:bg-violet-500/10 transition-all group"
+            >
               <Sparkles className="w-4 h-4 text-violet-400" />
               <span className="flex-1 text-left text-violet-400">MCP連携</span>
-              <ExternalLink className="w-3 h-3 text-violet-400/50 group-hover:text-violet-400 transition-colors" />
             </button>
-            <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group">
+            <button
+              onClick={() => { setSettingsTab("preferences"); setShowSettings(true); }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] text-white/40 hover:text-white/70 hover:bg-white/[0.03] transition-all group"
+            >
               <Settings className="w-4 h-4" />
               <span className="flex-1 text-left">Preferences</span>
             </button>
@@ -3273,6 +3454,211 @@ export default function PrototypePage() {
           </div>
         );
       })()}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowSettings(false)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-2xl max-h-[85vh] bg-[#111113] border border-white/[0.08] rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 fade-in duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
+              <div className="flex items-center gap-3">
+                <Settings className="w-5 h-5 text-violet-400" />
+                <h2 className="text-[17px] font-semibold text-white/90">設定</h2>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                className="p-2 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-white/[0.06]">
+              {[
+                { id: "account" as const, label: "Account", icon: User },
+                { id: "apikeys" as const, label: "API Keys", icon: Key },
+                { id: "mcp" as const, label: "MCP連携", icon: Sparkles },
+                { id: "preferences" as const, label: "Preferences", icon: Settings },
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSettingsTab(tab.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-5 py-3 text-[13px] font-medium transition-all border-b-2 -mb-px",
+                    settingsTab === tab.id
+                      ? "text-violet-400 border-violet-400"
+                      : "text-white/40 border-transparent hover:text-white/60"
+                  )}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(85vh-130px)]">
+              {/* Account Tab */}
+              {settingsTab === "account" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-4">アカウント情報</h3>
+                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
+                          <User className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-[14px] text-white/80 font-medium">{userEmail || "読み込み中..."}</p>
+                          <p className="text-[12px] text-white/40">ログイン中</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-4">セッション</h3>
+                    <button
+                      onClick={async () => {
+                        const supabase = createClient();
+                        await supabase.auth.signOut();
+                        window.location.href = "/auth/login";
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 text-rose-400 hover:bg-rose-500/10 rounded-xl text-[13px] font-medium transition-all"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      ログアウト
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* API Keys Tab */}
+              {settingsTab === "apikeys" && (
+                <SettingsApiKeys />
+              )}
+
+              {/* MCP Tab */}
+              {settingsTab === "mcp" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-2">MCP (Model Context Protocol)</h3>
+                    <p className="text-[13px] text-white/40 mb-4">
+                      ClaudeやChatGPTからこのアプリにアクセスして、メモやタスクを操作できます。
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-violet-500/10 border border-violet-500/20 rounded-xl">
+                    <h4 className="text-[14px] font-medium text-violet-400 mb-3">Claude Desktop 設定</h4>
+                    <p className="text-[12px] text-white/50 mb-3">
+                      Claude Desktopの設定ファイルに以下を追加してください:
+                    </p>
+                    <pre className="p-4 bg-black/40 rounded-lg text-[11px] text-white/70 overflow-x-auto font-mono">
+{`{
+  "mcpServers": {
+    "capture-and-think": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic/mcp-remote-server",
+        "${typeof window !== 'undefined' ? window.location.origin : 'https://your-app.vercel.app'}/api/mcp"
+      ],
+      "env": {
+        "API_KEY": "ct_your-api-key-here"
+      }
+    }
+  }
+}`}
+                    </pre>
+                  </div>
+
+                  <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-xl">
+                    <h4 className="text-[14px] font-medium text-white/80 mb-3">利用可能なMCPツール</h4>
+                    <ul className="space-y-2 text-[13px] text-white/50">
+                      <li className="flex items-start gap-2">
+                        <span className="text-violet-400">•</span>
+                        <span><strong className="text-white/70">list_items</strong> - メモ一覧を取得</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-violet-400">•</span>
+                        <span><strong className="text-white/70">create_item</strong> - 新しいメモを作成</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-violet-400">•</span>
+                        <span><strong className="text-white/70">update_item</strong> - メモを更新</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-violet-400">•</span>
+                        <span><strong className="text-white/70">search_items</strong> - メモを検索</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
+              {/* Preferences Tab */}
+              {settingsTab === "preferences" && (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-4">外観</h3>
+                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Palette className="w-5 h-5 text-white/40" />
+                          <div>
+                            <p className="text-[14px] text-white/80">テーマ</p>
+                            <p className="text-[12px] text-white/40">ダークモードが有効</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 text-[12px] text-white/40 bg-white/[0.04] rounded-lg">Dark</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-4">通知</h3>
+                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Bell className="w-5 h-5 text-white/40" />
+                          <div>
+                            <p className="text-[14px] text-white/80">プッシュ通知</p>
+                            <p className="text-[12px] text-white/40">期限のリマインダー</p>
+                          </div>
+                        </div>
+                        <span className="px-3 py-1 text-[12px] text-white/40 bg-white/[0.04] rounded-lg">未設定</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-white/90 mb-4">データ</h3>
+                    <div className="p-4 bg-white/[0.02] rounded-xl border border-white/[0.06]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Shield className="w-5 h-5 text-white/40" />
+                          <div>
+                            <p className="text-[14px] text-white/80">データエクスポート</p>
+                            <p className="text-[12px] text-white/40">すべてのデータをJSON形式でダウンロード</p>
+                          </div>
+                        </div>
+                        <button className="px-3 py-1.5 text-[12px] text-white/60 hover:text-white/80 bg-white/[0.04] hover:bg-white/[0.08] rounded-lg transition-all">
+                          エクスポート
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
