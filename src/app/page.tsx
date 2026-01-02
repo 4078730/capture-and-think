@@ -1646,6 +1646,15 @@ export default function PrototypePage() {
   const [showSettings, setShowSettings] = useState(false);
   const [settingsTab, setSettingsTab] = useState<"account" | "apikeys" | "mcp" | "preferences">("account");
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Track screen size for responsive layout
+  useEffect(() => {
+    const checkIsDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    checkIsDesktop();
+    window.addEventListener("resize", checkIsDesktop);
+    return () => window.removeEventListener("resize", checkIsDesktop);
+  }, []);
 
   // Fetch version info and user info on mount
   useEffect(() => {
@@ -2179,8 +2188,8 @@ export default function PrototypePage() {
     setTasks(tasks.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
   };
 
-  // Full-screen editor
-  if (selectedNote) {
+  // Mobile: Full-screen editor (desktop uses inline editor in 3-column layout)
+  if (selectedNote && !isDesktop) {
     const color = colorConfig[selectedNote.color] || colorConfig.violet;
 
     return (
@@ -3044,27 +3053,35 @@ export default function PrototypePage() {
         </div>
       </aside>
 
-      {/* Main */}
-      <main className="lg:pl-64 min-h-screen">
-        <header className="sticky top-0 z-10 px-5 lg:px-6 py-4 bg-[#09090b]/80 backdrop-blur-2xl border-b border-white/[0.04]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-[17px] font-semibold text-white/95 tracking-tight">
-                {selectedBucket ? buckets.find(b => b.id === selectedBucket)?.label : "All Notes"}
-              </h1>
-              <span className="text-[12px] text-white/25 bg-white/[0.03] px-2.5 py-1 rounded-lg">
-                {filteredNotes.length} notes
-              </span>
+      {/* Main - 3 Column Layout on Desktop */}
+      <main className="lg:pl-64 min-h-screen lg:flex">
+        {/* List Panel */}
+        <div className={cn(
+          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col min-h-screen",
+          isDesktop && selectedNote && "hidden lg:flex"
+        )}>
+          <header className="sticky top-0 z-10 px-4 lg:px-5 py-4 bg-[#09090b]/80 backdrop-blur-2xl border-b border-white/[0.04]">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h1 className="text-[15px] font-semibold text-white/95 tracking-tight">
+                  {selectedBucket ? buckets.find(b => b.id === selectedBucket)?.label : "All Notes"}
+                </h1>
+                <span className="text-[11px] text-white/25 bg-white/[0.03] px-2 py-0.5 rounded-lg">
+                  {filteredNotes.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setShowSearch(true)} className="p-2 hover:bg-white/[0.04] rounded-lg transition-colors">
+                  <Search className="w-4 h-4 text-white/40" />
+                </button>
+                <button onClick={handleCreateNote} className="p-2 hover:bg-white/[0.04] rounded-lg transition-colors lg:hidden">
+                  <Plus className="w-4 h-4 text-white/40" />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setShowSearch(true)} className="lg:hidden p-2.5 hover:bg-white/[0.04] rounded-xl transition-colors">
-                <Search className="w-5 h-5 text-white/40" />
-              </button>
-            </div>
-          </div>
-        </header>
+          </header>
 
-        <div className="p-5 lg:p-6">
+          <div className="flex-1 overflow-y-auto p-3 lg:p-4">
           {/* Loading State */}
           {isLoading && (
             <div className="flex items-center justify-center py-20">
@@ -3118,99 +3135,215 @@ export default function PrototypePage() {
             </div>
           )}
 
-          {/* Notes Grid */}
+          {/* Notes List */}
           {!isLoading && !error && filteredNotes.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-            {filteredNotes.map((note, index) => {
-              const color = colorConfig[note.color] || colorConfig.violet;
-              const bucket = buckets.find(b => b.id === note.bucket);
-              return (
-                <article
-                  key={note.id}
-                  onClick={() => handleOpenNote(note)}
-                  draggable
-                  onDragStart={() => handleNoteDragStart(note.id)}
-                  onDragEnd={() => { setDraggedNote(null); setDragOverBucket(null); }}
-                  style={{ animationDelay: `${index * 50}ms` }}
-                  className={cn(
-                    "group relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden",
-                    "bg-[#18181b] border border-white/[0.06]",
-                    "hover:border-white/[0.1] hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20",
-                    "animate-in fade-in slide-in-from-bottom-2 duration-300 fill-mode-both",
-                    draggedNote === note.id && "opacity-50 scale-95",
-                    note.archived && "opacity-60"
-                  )}
-                >
-                  {/* Top accent line */}
-                  <div className={cn("h-0.5 w-full", color.dot)} />
-
-                  {/* Drag handle */}
-                  <div className="absolute top-3 right-3 p-1 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing">
-                    <GripVertical className="w-4 h-4 text-white/20" />
-                  </div>
-
-                  <div className="p-4">
-                    {/* 2段見出し: カテゴリ + タイトル */}
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <span className={cn("text-[11px] font-medium uppercase tracking-wide", color.text)}>
-                        {bucket?.label || note.bucket}
-                      </span>
-                      {note.pinned && <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30" />}
-                      {note.archived && <Archive className="w-3 h-3 text-violet-400" />}
-                    </div>
-                    <h3 className="font-semibold text-[16px] text-white/90 leading-snug mb-3">{note.title}</h3>
-
-                    <p className="text-[13px] text-white/40 line-clamp-2 leading-relaxed mb-3">{adfToPlainText(note.adfContent).slice(0, 150)}</p>
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        {note.tags.slice(0, 2).map(tag => (
-                          <span key={tag} className="text-[10px] text-white/25 bg-white/[0.04] px-1.5 py-0.5 rounded">{tag}</span>
-                        ))}
-                        {/* メディア数をADFから計算 */}
-                        {(() => {
-                          const mediaCount = note.adfContent.content.filter(n => n.type === "mediaSingle" || n.type === "mediaGroup").length;
-                          return mediaCount > 0 ? (
-                            <span className="flex items-center gap-1 text-[10px] text-white/20">
-                              <Image className="w-2.5 h-2.5" />
-                              {mediaCount}
-                            </span>
-                          ) : null;
-                        })()}
+            <div className="space-y-1">
+              {filteredNotes.map((note) => {
+                const color = colorConfig[note.color] || colorConfig.violet;
+                const isSelected = selectedNote?.id === note.id;
+                return (
+                  <button
+                    key={note.id}
+                    onClick={() => handleOpenNote(note)}
+                    className={cn(
+                      "w-full text-left p-3 rounded-xl transition-all duration-200",
+                      isSelected
+                        ? "bg-violet-500/15 border border-violet-500/30"
+                        : "hover:bg-white/[0.04] border border-transparent",
+                      note.archived && "opacity-60"
+                    )}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={cn("w-1 h-10 rounded-full flex-shrink-0 mt-0.5", color.dot)} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium text-[14px] text-white/90 truncate">{note.title}</h3>
+                          {note.pinned && <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 flex-shrink-0" />}
+                        </div>
+                        <p className="text-[12px] text-white/40 line-clamp-1">{adfToPlainText(note.adfContent).slice(0, 80)}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                          <span className="text-[10px] text-white/25">{note.updatedAt}</span>
+                          {note.tags.length > 0 && (
+                            <span className="text-[10px] text-white/20 bg-white/[0.04] px-1.5 py-0.5 rounded">{note.tags[0]}</span>
+                          )}
+                        </div>
                       </div>
-                      <span className="text-[10px] text-white/20">{note.updatedAt}</span>
                     </div>
-                  </div>
-                </article>
-              );
-            })}
-
-            <button
-              onClick={handleCreateNote}
-              className="group min-h-[200px] rounded-2xl border-2 border-dashed border-white/[0.04] hover:border-violet-500/30 flex flex-col items-center justify-center gap-3 transition-all duration-300 hover:bg-violet-500/[0.02]"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-white/[0.02] group-hover:bg-violet-500/10 flex items-center justify-center transition-all duration-300 group-hover:scale-110 group-hover:rotate-90">
-                <Plus className="w-6 h-6 text-white/20 group-hover:text-violet-400 transition-colors duration-300" />
-              </div>
-              <span className="text-[13px] text-white/25 group-hover:text-violet-400/70 font-medium transition-colors duration-300">New note</span>
-            </button>
-          </div>
+                  </button>
+                );
+              })}
+            </div>
           )}
+
+          {/* Tasks Section */}
+          <div className="mt-6 pt-4 border-t border-white/[0.06]">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-[12px] font-semibold text-white/40 uppercase tracking-widest">Tasks</h2>
+              <span className="text-[11px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">{incompleteTasks.length}</span>
+            </div>
+            <div className="space-y-1">
+              {getRootTasks(tasks).filter(t => !t.completed).slice(0, 5).map(task => {
+                const relatedNote = notes.find(n => n.id === task.noteId);
+                const noteColor = relatedNote ? colorConfig[relatedNote.color] : colorConfig.violet;
+                return (
+                  <button
+                    key={task.id}
+                    onClick={() => setSelectedTask(task)}
+                    className="w-full flex items-start gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all text-left"
+                  >
+                    <div className={cn("w-4 h-4 rounded border-2 flex-shrink-0 mt-0.5", noteColor?.border || "border-white/20")} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-white/70 truncate">{task.title}</p>
+                      {task.dueDate && (
+                        <p className="text-[11px] text-white/30">{task.dueDate}</p>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+              {incompleteTasks.length === 0 && (
+                <p className="text-[12px] text-white/30 text-center py-4">タスクはありません</p>
+              )}
+            </div>
+          </div>
+          </div>
+
+          {/* Version Info */}
+          <div className="px-4 py-3 border-t border-white/[0.06] text-[10px] text-white/20">
+            <span className="font-mono">{versionInfo?.commit || "..."}</span>
+          </div>
         </div>
 
-        {/* Version Footer */}
-        <footer className="px-5 lg:px-6 py-3 border-t border-white/[0.06] mt-8 bg-black/20">
-          <div className="text-[11px] text-white/30 space-y-0.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono bg-white/[0.05] px-1.5 py-0.5 rounded">{versionInfo?.commit || "loading..."}</span>
-              <span className="text-white/20">•</span>
-              <span>{versionInfo?.deployedAt ? new Date(versionInfo.deployedAt).toLocaleString("ja-JP") : "..."}</span>
-            </div>
-            <div className="text-white/25 truncate">
-              {versionInfo?.message || "Loading..."}
-            </div>
+        {/* Detail Panel - Desktop Only */}
+        {isDesktop && (
+          <div className="flex-1 flex flex-col min-h-screen bg-[#0c0c0e]">
+            {selectedNote ? (
+              <>
+                {/* Editor Header */}
+                <header className="sticky top-0 z-10 px-6 py-4 bg-[#0c0c0e]/90 backdrop-blur-xl border-b border-white/[0.04]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <select
+                        value={selectedNote.bucket || ""}
+                        onChange={async (e) => {
+                          const newBucket = e.target.value || null;
+                          try {
+                            await updateItem.mutateAsync({
+                              id: selectedNote.id,
+                              bucket: newBucket as Bucket | null,
+                            });
+                            setSelectedNote({ ...selectedNote, bucket: newBucket });
+                            toast.success("グループを変更しました");
+                          } catch {
+                            toast.error("変更に失敗しました");
+                          }
+                        }}
+                        className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-3 py-1.5 text-[13px] text-white/60 cursor-pointer focus:outline-none focus:border-violet-500/50"
+                      >
+                        <option value="">グループなし</option>
+                        {buckets.filter(b => b.id).map(bucket => (
+                          <option key={bucket.id} value={bucket.id!}>{bucket.label}</option>
+                        ))}
+                      </select>
+                      <span className="text-white/30">/</span>
+                      <span className="text-[14px] text-white/70 font-medium">{editingTitle || "Untitled"}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={cn(
+                        "flex items-center gap-1.5 px-2 py-1 rounded-lg text-[11px]",
+                        saveStatus === "saving" && "text-amber-400 bg-amber-500/10",
+                        saveStatus === "saved" && "text-emerald-400 bg-emerald-500/10",
+                        saveStatus === "idle" && "text-white/20"
+                      )}>
+                        {saveStatus === "saving" && <><Loader2 className="w-3 h-3 animate-spin" />保存中</>}
+                        {saveStatus === "saved" && <><Check className="w-3 h-3" />保存済み</>}
+                        {saveStatus === "idle" && <><Clock className="w-3 h-3" />自動保存</>}
+                      </div>
+                      <button
+                        onClick={() => handleArchiveNote(selectedNote.id, selectedNote.archived)}
+                        className="p-2 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all"
+                      >
+                        {selectedNote.archived ? <ArchiveRestore className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+                      </button>
+                      <button
+                        onClick={() => handlePinNote(selectedNote.id, selectedNote.pinned)}
+                        className={cn(
+                          "p-2 rounded-lg transition-all",
+                          selectedNote.pinned ? "text-amber-400 bg-amber-500/10" : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
+                        )}
+                      >
+                        <Pin className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedNote(null)}
+                        className="p-2 text-white/30 hover:text-white/60 hover:bg-white/[0.04] rounded-lg transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </header>
+
+                {/* Editor Content */}
+                <div className="flex-1 overflow-y-auto">
+                  <div className="max-w-3xl mx-auto px-8 py-8">
+                    {/* Title */}
+                    <input
+                      type="text"
+                      value={editingTitle}
+                      onChange={(e) => setEditingTitle(e.target.value)}
+                      placeholder="Untitled"
+                      className="w-full text-[28px] font-bold text-white/90 bg-transparent border-none focus:outline-none placeholder:text-white/20 mb-6"
+                    />
+
+                    {/* Body */}
+                    <textarea
+                      value={editingContent}
+                      onChange={(e) => setEditingContent(e.target.value)}
+                      placeholder="Write your thoughts..."
+                      className="w-full min-h-[400px] text-[15px] text-white/70 leading-relaxed bg-transparent border-none focus:outline-none placeholder:text-white/20 resize-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Editor Footer */}
+                <footer className="px-6 py-3 border-t border-white/[0.04] flex items-center justify-between">
+                  <span className="text-[11px] text-white/20">{editingContent.length} chars</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        if (confirm("このノートを削除しますか？")) {
+                          handleDeleteNote(selectedNote.id);
+                        }
+                      }}
+                      className="text-[11px] text-rose-400 hover:bg-rose-500/10 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      削除
+                    </button>
+                  </div>
+                </footer>
+              </>
+            ) : (
+              /* Empty State */
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-2xl bg-white/[0.02] flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-white/20" />
+                  </div>
+                  <p className="text-[15px] text-white/40 mb-2">ノートを選択してください</p>
+                  <p className="text-[13px] text-white/25">左のリストからノートを選択するか、新規作成してください</p>
+                  <button
+                    onClick={handleCreateNote}
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 rounded-lg text-[13px] font-medium transition-all mx-auto"
+                  >
+                    <Plus className="w-4 h-4" />
+                    新規ノート作成
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </footer>
+        )}
       </main>
 
       {/* Search modal */}
