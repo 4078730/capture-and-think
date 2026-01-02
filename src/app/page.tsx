@@ -935,7 +935,7 @@ const mockNotes: {
   id: string;
   title: string;
   adfContent: ADFDocument;
-  bucket: string;
+  bucket: string | null;
   pinned: boolean;
   color: string;
   updatedAt: string;
@@ -2341,9 +2341,32 @@ export default function PrototypePage() {
                   <ArrowLeft className="w-4 h-4" />
                   <span>戻る</span>
                 </button>
-                {/* PC用のパンくず */}
+                {/* PC用のパンくず + バケット選択 */}
                 <div className="hidden lg:flex items-center gap-2 text-[13px] text-white/30">
-                  <span className="capitalize">{selectedNote.bucket}</span>
+                  <select
+                    value={selectedNote.bucket || ""}
+                    onChange={async (e) => {
+                      const newBucket = e.target.value || null;
+                      try {
+                        await updateItem.mutateAsync({
+                          id: selectedNote.id,
+                          bucket: newBucket as Bucket | null,
+                        });
+                        setSelectedNote({ ...selectedNote, bucket: newBucket });
+                        toast.success("グループを変更しました");
+                      } catch {
+                        toast.error("変更に失敗しました");
+                      }
+                    }}
+                    className="bg-white/[0.04] border border-white/[0.08] rounded-lg px-2 py-1 text-[12px] text-white/60 hover:text-white/80 cursor-pointer focus:outline-none focus:border-violet-500/50 capitalize"
+                  >
+                    <option value="">グループなし</option>
+                    {buckets.filter(b => b.id).map(bucket => (
+                      <option key={bucket.id} value={bucket.id!} className="capitalize">
+                        {bucket.label}
+                      </option>
+                    ))}
+                  </select>
                   <ChevronRight className="w-3.5 h-3.5" />
                   <span className="text-white/60 truncate max-w-[200px]">{editingTitle || "Untitled"}</span>
                 </div>
