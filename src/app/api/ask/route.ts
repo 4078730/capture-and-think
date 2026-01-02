@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const askSchema = z.object({
   query: z.string().min(1),
-  bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
+  bucket: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {

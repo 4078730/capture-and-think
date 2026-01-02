@@ -17,7 +17,7 @@ const adfDocumentSchema = z.object({
 
 const updateItemSchema = z.object({
   body: z.string().min(1).optional(),
-  bucket: z.enum(["work", "video", "life", "boardgame"]).nullable().optional(),
+  bucket: z.string().nullable().optional(),
   pinned: z.boolean().optional(),
   memo: z.string().optional(),
   due_date: z.string().nullable().optional(),

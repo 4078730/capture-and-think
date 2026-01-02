@@ -5,13 +5,13 @@ import type { Bucket, Kind } from "@/types";
 
 const approveSchema = z.object({
   // Optional overrides - user can modify AI suggestions before approving
-  bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
+  bucket: z.string().optional(),
   category: z.string().optional(),
   kind: z.enum(["idea", "task", "note", "reference", "unknown"]).optional(),
 });
 
 type ApproveOverrides = {
-  bucket?: Bucket;
+  bucket?: string;
   category?: string;
   kind?: Kind;
 };

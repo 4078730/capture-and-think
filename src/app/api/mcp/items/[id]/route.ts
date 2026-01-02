@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const updateItemSchema = z.object({
   body: z.string().min(1).optional(),
-  bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
+  bucket: z.string().optional(),
   pinned: z.boolean().optional(),
   due_date: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),

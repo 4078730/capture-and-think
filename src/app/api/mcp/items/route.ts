@@ -5,7 +5,7 @@ import { z } from "zod";
 
 const createItemSchema = z.object({
   body: z.string().min(1),
-  bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
+  bucket: z.string().optional(),
   due_date: z.string().optional(), // YYYY-MM-DD format
   memo: z.string().optional(),
 });

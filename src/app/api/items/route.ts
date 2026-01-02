@@ -11,7 +11,7 @@ const adfDocumentSchema = z.object({
 
 const createItemSchema = z.object({
   body: z.string().min(1),
-  bucket: z.enum(["work", "video", "life", "boardgame"]).optional(),
+  bucket: z.string().optional(),
   source: z.string().optional(),
   adf_content: adfDocumentSchema.nullable().optional(),
 });
