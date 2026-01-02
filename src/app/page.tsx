@@ -1469,11 +1469,27 @@ function itemToNote(item: Item): Note {
   };
 }
 
+// Version info type
+interface VersionInfo {
+  commit: string;
+  message: string;
+  deployedAt: string;
+}
+
 export default function PrototypePage() {
   const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
   const [tasks, setTasks] = useState(mockTasks);
   const [showArchived, setShowArchived] = useState(false);
+  const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null);
+
+  // Fetch version info on mount
+  useEffect(() => {
+    fetch("/api/version")
+      .then(res => res.json())
+      .then(data => setVersionInfo(data))
+      .catch(() => {});
+  }, []);
 
   // API hooks
   const { data: itemsData, isLoading, error } = useItems({ status: showArchived ? "archived" : "active" });
@@ -2982,12 +2998,12 @@ export default function PrototypePage() {
         <footer className="px-5 lg:px-6 py-3 border-t border-white/[0.06] mt-8 bg-black/20">
           <div className="text-[11px] text-white/30 space-y-0.5">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono bg-white/[0.05] px-1.5 py-0.5 rounded">{process.env.NEXT_PUBLIC_GIT_COMMIT_SHA || "local"}</span>
+              <span className="font-mono bg-white/[0.05] px-1.5 py-0.5 rounded">{versionInfo?.commit || "loading..."}</span>
               <span className="text-white/20">•</span>
-              <span>{process.env.NEXT_PUBLIC_BUILD_TIME ? new Date(process.env.NEXT_PUBLIC_BUILD_TIME).toLocaleString("ja-JP") : "dev"}</span>
+              <span>{versionInfo?.deployedAt ? new Date(versionInfo.deployedAt).toLocaleString("ja-JP") : "..."}</span>
             </div>
             <div className="text-white/25 truncate">
-              {process.env.NEXT_PUBLIC_GIT_COMMIT_MESSAGE || "Development mode"}
+              {versionInfo?.message || "Loading..."}
             </div>
           </div>
         </footer>
