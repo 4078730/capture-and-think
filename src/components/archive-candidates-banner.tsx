@@ -28,11 +28,11 @@ export function ArchiveCandidatesBanner() {
   };
 
   return (
-    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg overflow-hidden">
+    <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg overflow-hidden mb-4">
       <div className="flex items-center justify-between p-3">
         <div className="flex items-center gap-2">
-          <Archive className="w-5 h-5 text-amber-500" />
-          <span className="text-sm font-medium">
+          <Archive className="w-5 h-5 text-amber-400" />
+          <span className="text-sm font-medium text-white/90">
             {data.total}件の古いアイテムがあります
           </span>
         </div>
@@ -40,7 +40,7 @@ export function ArchiveCandidatesBanner() {
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1 hover:bg-[var(--secondary)] rounded transition-colors"
+            className="p-1 hover:bg-white/[0.05] rounded transition-colors text-white/50 hover:text-white/70"
           >
             {isExpanded ? (
               <ChevronUp className="w-4 h-4" />
@@ -51,7 +51,7 @@ export function ArchiveCandidatesBanner() {
           <button
             type="button"
             onClick={() => setIsDismissed(true)}
-            className="p-1 hover:bg-[var(--secondary)] rounded transition-colors"
+            className="p-1 hover:bg-white/[0.05] rounded transition-colors text-white/50 hover:text-white/70"
           >
             <X className="w-4 h-4" />
           </button>
@@ -64,18 +64,18 @@ export function ArchiveCandidatesBanner() {
             {data.items.slice(0, 10).map((item) => (
               <div
                 key={item.id}
-                className="px-3 py-2 border-b border-[var(--border)] last:border-b-0"
+                className="px-3 py-2 border-b border-white/[0.08] last:border-b-0 hover:bg-white/[0.02]"
               >
-                <p className="text-sm text-[var(--foreground)] truncate">
+                <p className="text-sm text-white/90 truncate">
                   {truncateText(item.body, 60)}
                 </p>
-                <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+                <p className="text-xs text-white/40 mt-0.5">
                   {formatRelativeTime(item.created_at)}
                 </p>
               </div>
             ))}
             {data.total > 10 && (
-              <div className="px-3 py-2 text-center text-xs text-[var(--muted-foreground)]">
+              <div className="px-3 py-2 text-center text-xs text-white/40">
                 他 {data.total - 10}件
               </div>
             )}

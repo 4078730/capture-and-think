@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Search, Star, ChevronDown, Settings, ArrowUpDown, Calendar, Clock, Tag, Hash, Zap, Film, Heart, Gamepad2, Archive, Command, X, Folder, FileText, Briefcase, Check } from "lucide-react";
+import { Plus, Search, Star, ChevronDown, Settings, ArrowUpDown, Calendar, Clock, Tag, Hash, Zap, Film, Heart, Gamepad2, Archive, Command, X, Folder, FileText, Briefcase, Check, Inbox, MessageCircle, Sparkles } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { ResponsiveLayout } from "@/components/responsive-layout";
 import { BucketSelector } from "@/components/bucket-selector";
@@ -26,6 +27,7 @@ interface CustomBucket {
 }
 
 export default function HomePage() {
+  const pathname = usePathname();
   const [bucket, setBucket] = useState<Bucket | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -473,6 +475,51 @@ export default function HomePage() {
             <Plus className="w-4 h-4 flex-shrink-0" />
             <span className="flex-1 text-left">プロジェクトを追加</span>
           </button>
+
+          {/* Navigation Links */}
+          <div className="mt-6 pt-6 border-t border-white/[0.08]">
+            <div className="space-y-1">
+              <Link
+                href="/inbox"
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200",
+                  pathname === "/inbox"
+                    ? "bg-white/[0.08] text-white"
+                    : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+                )}
+                style={{ minHeight: "36px" }}
+              >
+                <Inbox className={cn("w-4 h-4 flex-shrink-0", pathname === "/inbox" ? "text-violet-400" : "")} />
+                <span className="flex-1 text-left">Inbox</span>
+              </Link>
+              <Link
+                href="/ask"
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200",
+                  pathname === "/ask"
+                    ? "bg-white/[0.08] text-white"
+                    : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+                )}
+                style={{ minHeight: "36px" }}
+              >
+                <MessageCircle className={cn("w-4 h-4 flex-shrink-0", pathname === "/ask" ? "text-violet-400" : "")} />
+                <span className="flex-1 text-left">Ask AI</span>
+              </Link>
+              <Link
+                href="/review"
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200",
+                  pathname === "/review"
+                    ? "bg-white/[0.08] text-white"
+                    : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+                )}
+                style={{ minHeight: "36px" }}
+              >
+                <Sparkles className={cn("w-4 h-4 flex-shrink-0", pathname === "/review" ? "text-violet-400" : "")} />
+                <span className="flex-1 text-left">AI Review</span>
+              </Link>
+            </div>
+          </div>
 
         </nav>
       </aside>
