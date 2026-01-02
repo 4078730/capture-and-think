@@ -1724,7 +1724,8 @@ export default function PrototypePage() {
         clearTimeout(saveTimeoutRef.current);
       }
     };
-  }, [editingTitle, editingContent, editingMedia, selectedNote?.id, updateItem]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingTitle, editingContent, editingMedia, selectedNote?.id]);
 
   // キーボードショートカット
   useEffect(() => {
