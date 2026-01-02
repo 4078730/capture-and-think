@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Item, Bucket, Subtask, ApiKey } from "@/types";
 import { LogOut, Copy, Eye, EyeOff, Palette, Bell, Shield } from "lucide-react";
+import { SimpleNotesList, type Note as SimpleNote } from "@/components/simple-notes-list";
 
 // Save status type
 type SaveStatus = "idle" | "saving" | "saved";
@@ -1670,8 +1671,29 @@ export default function PrototypePage() {
     });
   }, []);
 
-  // API hooks
-  const { data: itemsData, isLoading, error } = useItems({ status: showArchived ? "archived" : "active" });
+  // Simple fetch instead of React Query (fixing loading issue)
+  const [itemsData, setItemsData] = useState<{ items: Item[]; total: number } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      setIsLoading(true);
+      try {
+        const status = showArchived ? "archived" : "active";
+        const res = await fetch(`/api/items?status=${status}`);
+        if (!res.ok) throw new Error("Failed to fetch");
+        const data = await res.json();
+        setItemsData(data);
+        setError(null);
+      } catch (e) {
+        setError(e instanceof Error ? e : new Error("Unknown error"));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchItems();
+  }, [showArchived]);
   const updateItem = useUpdateItem();
   const createItem = useCreateItem();
   const archiveItemMutation = useArchiveItem();
@@ -1681,9 +1703,9 @@ export default function PrototypePage() {
 
   // Convert API items to notes
   const notes = useMemo(() => {
-    if (!itemsData?.items) return [];
+    if (!itemsData || !itemsData.items) return [];
     return itemsData.items.map(itemToNote);
-  }, [itemsData?.items]);
+  }, [itemsData]);
   const [editingContent, setEditingContent] = useState("");
   const [editingMedia, setEditingMedia] = useState<EmbeddedMedia[]>([]);
   const [editingTitle, setEditingTitle] = useState("");
@@ -2095,13 +2117,15 @@ export default function PrototypePage() {
     setDragOverBucket(null);
   }, [draggedNote]);
 
-  const filteredNotes = useMemo(() => notes.filter(n => {
-    if (!showArchived && n.archived) return false;
-    if (showArchived && !n.archived) return false;
-    if (selectedBucket && n.bucket !== selectedBucket) return false;
-    if (searchQuery && !n.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
-    return true;
-  }), [notes, selectedBucket, searchQuery, showArchived]);
+  const filteredNotes = useMemo(() => {
+    return notes.filter(n => {
+      if (!showArchived && n.archived) return false;
+      if (showArchived && !n.archived) return false;
+      if (selectedBucket && n.bucket !== selectedBucket) return false;
+      if (searchQuery && !n.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+  }, [notes, selectedBucket, searchQuery, showArchived]);
 
   const incompleteTasks = tasks.filter(t => !t.completed);
 
@@ -3054,173 +3078,40 @@ export default function PrototypePage() {
       </aside>
 
       {/* Main - 3 Column Layout on Desktop */}
-      <main className="lg:pl-64 h-screen lg:flex overflow-hidden">
-        {/* List Panel */}
-        <div className={cn(
-          "w-full lg:w-80 xl:w-96 lg:border-r lg:border-white/[0.04] flex flex-col h-full",
-          isDesktop && selectedNote && "hidden lg:flex"
-        )}>
-          <header className="sticky top-0 z-10 px-4 lg:px-5 py-4 bg-[#09090b]/80 backdrop-blur-2xl border-b border-white/[0.04]">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <h1 className="text-[15px] font-semibold text-white/95 tracking-tight">
-                  {selectedBucket ? buckets.find(b => b.id === selectedBucket)?.label : "All Notes"}
-                </h1>
-                <span className="text-[11px] text-white/25 bg-white/[0.03] px-2 py-0.5 rounded-lg">
-                  {filteredNotes.length}
-                </span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button onClick={() => setShowSearch(true)} className="p-2 hover:bg-white/[0.04] rounded-lg transition-colors">
-                  <Search className="w-4 h-4 text-white/40" />
-                </button>
-                <button onClick={handleCreateNote} className="p-2 hover:bg-white/[0.04] rounded-lg transition-colors lg:hidden">
-                  <Plus className="w-4 h-4 text-white/40" />
-                </button>
-              </div>
-            </div>
-          </header>
-
-          <div className="flex-1 overflow-y-auto p-3 lg:p-4">
-          {/* Loading State */}
-          {isLoading && (
-            <div className="flex items-center justify-center py-20">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="w-8 h-8 text-violet-400 animate-spin" />
-                <p className="text-white/40 text-sm">読み込み中...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Error State */}
-          {error && (
-            <div className="flex items-center justify-center py-20">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
-                  <X className="w-6 h-6 text-red-400" />
-                </div>
-                <div>
-                  <p className="text-white/60 font-medium">データの読み込みに失敗しました</p>
-                  <p className="text-white/30 text-sm mt-1">ページを更新してください</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Empty State */}
-          {!isLoading && !error && filteredNotes.length === 0 && (
-            <div className="flex items-center justify-center py-20">
-              <div className="flex flex-col items-center gap-4 text-center">
-                <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center">
-                  <FileText className="w-8 h-8 text-violet-400" />
-                </div>
-                <div>
-                  <p className="text-white/60 font-medium">
-                    {showArchived ? "アーカイブされたノートはありません" : "ノートがありません"}
-                  </p>
-                  <p className="text-white/30 text-sm mt-1">
-                    {showArchived ? "アーカイブにはまだ何もありません" : "新しいノートを作成してみましょう"}
-                  </p>
-                </div>
-                {!showArchived && (
-                  <button
-                    onClick={handleCreateNote}
-                    className="mt-2 px-4 py-2 bg-violet-500/20 hover:bg-violet-500/30 text-violet-400 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    <Plus className="w-4 h-4 inline-block mr-1" />
-                    新規ノート作成
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Notes List */}
-          {!isLoading && !error && filteredNotes.length > 0 && (
-            <div className="space-y-1">
-              {filteredNotes.map((note) => {
-                const color = colorConfig[note.color] || colorConfig.violet;
-                const isSelected = selectedNote?.id === note.id;
-                return (
-                  <button
-                    key={note.id}
-                    onClick={() => handleOpenNote(note)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl transition-all duration-200",
-                      isSelected
-                        ? "bg-violet-500/15 border border-violet-500/30"
-                        : "hover:bg-white/[0.04] border border-transparent",
-                      note.archived && "opacity-60"
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={cn("w-1 h-10 rounded-full flex-shrink-0 mt-0.5", color.dot)} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-[14px] text-white/90 truncate">{note.title}</h3>
-                          {note.pinned && <Pin className="w-3 h-3 text-amber-400 fill-amber-400/30 flex-shrink-0" />}
-                        </div>
-                        <p className="text-[12px] text-white/40 line-clamp-1">{adfToPlainText(note.adfContent).slice(0, 80)}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[10px] text-white/25">{note.updatedAt}</span>
-                          {note.tags.length > 0 && (
-                            <span className="text-[10px] text-white/20 bg-white/[0.04] px-1.5 py-0.5 rounded">{note.tags[0]}</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Tasks Section */}
-          <div className="mt-6 pt-4 border-t border-white/[0.06]">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-[12px] font-semibold text-white/40 uppercase tracking-widest">Tasks</h2>
-              <span className="text-[11px] text-violet-400 bg-violet-500/10 px-2 py-0.5 rounded-full">{incompleteTasks.length}</span>
-            </div>
-            <div className="space-y-1">
-              {getRootTasks(tasks).filter(t => !t.completed).slice(0, 5).map(task => {
-                const relatedNote = notes.find(n => n.id === task.noteId);
-                const noteColor = relatedNote ? colorConfig[relatedNote.color] : colorConfig.violet;
-                return (
-                  <button
-                    key={task.id}
-                    onClick={() => setSelectedTask(task)}
-                    className="w-full flex items-start gap-3 p-2.5 rounded-lg hover:bg-white/[0.04] transition-all text-left"
-                  >
-                    <div className={cn("w-4 h-4 rounded border-2 flex-shrink-0 mt-0.5", noteColor?.border || "border-white/20")} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[13px] text-white/70 truncate">{task.title}</p>
-                      {task.dueDate && (
-                        <p className="text-[11px] text-white/30">{task.dueDate}</p>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-              {incompleteTasks.length === 0 && (
-                <p className="text-[12px] text-white/30 text-center py-4">タスクはありません</p>
-              )}
-            </div>
+      <main className="lg:pl-64 h-screen flex">
+        {/* List Panel - Column 1 */}
+        <div className="w-80 border-r border-white/10 flex flex-col bg-zinc-900">
+          <div className="p-4 border-b border-white/10">
+            <h2 className="text-white font-bold">Notes</h2>
           </div>
-          </div>
-
-          {/* Version Info */}
-          <div className="px-4 py-3 border-t border-white/[0.06] text-[10px] text-white/20">
-            <span className="font-mono">{versionInfo?.commit || "..."}</span>
-          </div>
+          <SimpleNotesList
+            showArchived={showArchived}
+            selectedNoteId={selectedNote?.id || null}
+            onSelectNote={(note: SimpleNote) => {
+              setSelectedNote({
+                id: note.id,
+                title: note.title,
+                adfContent: plainTextToADF(note.body),
+                bucket: note.bucket,
+                pinned: note.pinned,
+                color: "violet",
+                updatedAt: note.updatedAt,
+                tags: [],
+                archived: showArchived,
+              });
+              setEditingTitle(note.title);
+              setEditingContent(note.body);
+            }}
+          />
         </div>
 
         {/* Detail Panel - Desktop Only */}
         {isDesktop && (
-          <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#0c0c0e]">
+          <div className="flex-1 flex flex-col h-full bg-[#0c0c0e]">
             {selectedNote ? (
-              <>
+              <div className="flex flex-col h-full">
                 {/* Editor Header */}
-                <header className="sticky top-0 z-10 px-6 py-4 bg-[#0c0c0e]/90 backdrop-blur-xl border-b border-white/[0.04]">
+                <header className="flex-shrink-0 px-6 py-4 bg-[#0c0c0e]/90 backdrop-blur-xl border-b border-white/[0.04]">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <select
@@ -3285,8 +3176,8 @@ export default function PrototypePage() {
                 </header>
 
                 {/* Editor Content */}
-                <div className="flex-1 overflow-y-auto bg-[#0c0c0e]">
-                  <div className="max-w-3xl mx-auto px-8 py-8 min-h-[200px]">
+                <div className="flex-1 overflow-y-auto min-h-0">
+                  <div className="max-w-3xl mx-auto px-8 py-8">
                     {/* Title */}
                     <input
                       type="text"
@@ -3307,7 +3198,7 @@ export default function PrototypePage() {
                 </div>
 
                 {/* Editor Footer */}
-                <footer className="px-6 py-3 border-t border-white/[0.04] flex items-center justify-between">
+                <footer className="flex-shrink-0 px-6 py-3 border-t border-white/[0.04] flex items-center justify-between">
                   <span className="text-[11px] text-white/20">{editingContent.length} chars</span>
                   <div className="flex items-center gap-2">
                     <button
@@ -3322,7 +3213,7 @@ export default function PrototypePage() {
                     </button>
                   </div>
                 </footer>
-              </>
+              </div>
             ) : (
               /* Empty State */
               <div className="flex-1 flex items-center justify-center">
