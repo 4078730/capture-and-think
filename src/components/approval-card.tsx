@@ -7,16 +7,23 @@ import { cn } from "@/lib/utils";
 
 const bucketLabels: Record<Bucket, string> = {
   work: "仕事",
+  management: "管理",
+  rfa: "RFA",
+  cxc: "CXC",
+  paper: "論文",
   video: "動画",
   life: "生活",
-  boardgame: "ボドゲ",
+  game: "ゲーム",
 };
 
 const bucketColors: Record<Bucket, string> = {
-  work: "bg-blue-500",
+  management: "bg-slate-500",
+  rfa: "bg-blue-500",
+  cxc: "bg-cyan-500",
+  paper: "bg-yellow-500",
   video: "bg-purple-500",
   life: "bg-green-500",
-  boardgame: "bg-orange-500",
+  game: "bg-orange-500",
 };
 
 const kindLabels: Record<Kind, string> = {
@@ -115,7 +122,7 @@ export function ApprovalCard({ item, onApprove, onReject, isLoading }: ApprovalC
           <div>
             <label className="text-xs text-[var(--muted-foreground)] mb-1 block">バケット</label>
             <div className="flex gap-2 flex-wrap">
-              {(["work", "video", "life", "boardgame"] as Bucket[]).map((b) => (
+              {(["management", "rfa", "cxc", "paper", "video", "life", "game"] as Bucket[]).map((b) => (
                 <button
                   key={b}
                   type="button"

@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
   "title": "タスク・メモのタイトル（30文字以内）",
   "summary": "1行の要約（50文字以内）",
   "body": "詳細な内容。元の情報を整理して、必要な情報を含めてください。",
-  "suggestedBucket": "work / video / life / boardgame のいずれか（最も適切なもの）",
+  "suggestedBucket": "management / rfa / cxc / paper / video / life / game のいずれか（最も適切なもの）",
   "tags": ["関連するタグ", "固有名詞", "キーワード"],
   "references": ["参照URL1", "参照URL2"]
 }

@@ -11,10 +11,13 @@ interface BucketSelectorProps {
 }
 
 const buckets: { value: Bucket; label: string }[] = [
-  { value: "work", label: "Work" },
+  { value: "management", label: "Management" },
+  { value: "rfa", label: "RFA" },
+  { value: "cxc", label: "CXC" },
+  { value: "paper", label: "Paper" },
   { value: "video", label: "Video" },
   { value: "life", label: "Life" },
-  { value: "boardgame", label: "Board" },
+  { value: "game", label: "Game" },
 ];
 
 export function BucketSelector({

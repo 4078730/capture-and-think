@@ -1,6 +1,6 @@
 import type { Bucket, ParsedInput } from "@/types";
 
-const BUCKET_PATTERN = /#(work|video|life|boardgame)\b/gi;
+const BUCKET_PATTERN = /#(management|rfa|cxc|paper|video|life|game)\b/gi;
 const KEEP_PATTERN = /#keep\b/gi;
 
 export function parseInput(raw: string): ParsedInput {

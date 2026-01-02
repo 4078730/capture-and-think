@@ -32,20 +32,26 @@ export function truncateText(text: string, maxLength: number): string {
 
 export function getBucketLabel(bucket: string | null): string {
   const labels: Record<string, string> = {
-    work: "Work",
+    management: "Management",
+    rfa: "RFA",
+    cxc: "CXC",
+    paper: "Paper",
     video: "Video",
     life: "Life",
-    boardgame: "Boardgame",
+    game: "Game",
   };
   return bucket ? labels[bucket] || bucket : "";
 }
 
 export function getBucketColor(bucket: string | null): string {
   const colors: Record<string, string> = {
-    work: "bg-blue-500",
-    video: "bg-purple-500",
-    life: "bg-green-500",
-    boardgame: "bg-orange-500",
+    management: "bg-slate-500",
+    rfa: "bg-blue-500",
+    cxc: "bg-cyan-500",
+    paper: "bg-yellow-500",
+    video: "bg-blue-500", // Videoは青
+    life: "bg-rose-500", // Lifeは赤紫
+    game: "bg-orange-500",
   };
   return bucket ? colors[bucket] || "bg-gray-500" : "bg-gray-500";
 }

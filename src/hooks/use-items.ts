@@ -44,7 +44,12 @@ export function useCreateItem() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
-      if (!res.ok) throw new Error("Failed to create item");
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        const error = new Error(errorData.error || "Failed to create item");
+        (error as any).response = { data: errorData };
+        throw error;
+      }
       return res.json() as Promise<Item>;
     },
     onSuccess: () => {

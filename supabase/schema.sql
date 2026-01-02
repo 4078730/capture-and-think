@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS items (
 
   -- User input fields (3 only)
   body TEXT NOT NULL,
-  bucket TEXT CHECK (bucket IN ('work', 'video', 'life', 'boardgame')),
+  bucket TEXT CHECK (bucket IS NULL OR bucket IN ('management', 'rfa', 'cxc', 'paper', 'video', 'life', 'game')),
   pinned BOOLEAN DEFAULT FALSE,
 
   -- Status

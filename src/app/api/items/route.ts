@@ -10,7 +10,7 @@ const adfDocumentSchema = z.object({
 });
 
 const createItemSchema = z.object({
-  body: z.string().min(1),
+  body: z.string(), // 空文字列も許可（新規ノート作成時）
   bucket: z.string().optional(),
   source: z.string().optional(),
   adf_content: adfDocumentSchema.nullable().optional(),
@@ -30,11 +30,14 @@ export async function POST(request: NextRequest) {
     const json = await request.json();
     const parsed = createItemSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
+      const errorMessage = parsed.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ');
+      return NextResponse.json({ error: errorMessage }, { status: 400 });
     }
 
-    // Parse input for hashtags
-    const { body, bucket: parsedBucket, pinned } = parseInput(parsed.data.body);
+    // Parse input for hashtags (空文字列の場合は"Untitled"を使用)
+    const inputBody = parsed.data.body.trim() || "Untitled";
+    const { body: parsedBody, bucket: parsedBucket, pinned } = parseInput(inputBody);
+    const body = parsedBody.trim() || "Untitled"; // parseInputの結果が空の場合も"Untitled"を使用
     const bucket = parsed.data.bucket ?? parsedBucket;
 
     const { data, error } = await supabase

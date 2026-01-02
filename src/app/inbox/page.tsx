@@ -75,7 +75,7 @@ export default function InboxPage() {
         });
       case "bucket":
         return items.sort((a, b) => {
-          const bucketOrder: Record<string, number> = { work: 0, video: 1, life: 2, boardgame: 3 };
+          const bucketOrder: Record<string, number> = { management: 0, rfa: 1, cxc: 2, paper: 3, video: 4, life: 5, game: 6 };
           const orderA = a.bucket ? bucketOrder[a.bucket] ?? 4 : 4;
           const orderB = b.bucket ? bucketOrder[b.bucket] ?? 4 : 4;
           if (orderA !== orderB) return orderA - orderB;

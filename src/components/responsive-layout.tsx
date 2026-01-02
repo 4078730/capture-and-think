@@ -17,17 +17,14 @@ export function ResponsiveLayout({
 }: ResponsiveLayoutProps) {
   return (
     <div className="min-h-screen md:flex">
-      {/* PC Sidebar */}
-      <Sidebar />
-
       {/* Main Content */}
       <div className="flex-1 md:overflow-auto">
         {showHeader && (
-          <header className="sticky top-0 z-10 bg-[var(--background)] border-b border-[var(--border)] md:hidden">
+          <header className="sticky top-0 z-10 bg-[#09090b]/90 backdrop-blur-2xl border-b border-white/[0.08] md:hidden">
             <div className="flex items-center h-14 px-4">
               <div className="w-10" />
               {headerTitle && (
-                <h1 className="flex-1 text-lg font-semibold text-center">
+                <h1 className="flex-1 text-lg font-semibold text-center text-white">
                   {headerTitle}
                 </h1>
               )}

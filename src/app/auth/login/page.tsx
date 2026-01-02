@@ -113,11 +113,22 @@ function LoginForm() {
 
   return (
     <div className="w-full max-w-sm space-y-6">
+      {/* Logo */}
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <div className="relative">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+            </div>
+            <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-violet-500 via-purple-500 to-fuchsia-600 blur-lg opacity-40" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-white tracking-tight">
           Capture & Think
         </h1>
-        <p className="mt-2 text-[var(--muted-foreground)]">
+        <p className="mt-2 text-white/50 text-sm">
           思いついた瞬間を逃さない
         </p>
       </div>
@@ -129,7 +140,7 @@ function LoginForm() {
           onChange={(e) => setEmail(e.target.value)}
           placeholder="メールアドレス"
           required
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
         />
         <input
           type="password"
@@ -138,12 +149,12 @@ function LoginForm() {
           placeholder="パスワード"
           required
           minLength={6}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"
+          className="w-full px-4 py-3 bg-white/[0.02] border border-white/[0.08] rounded-xl text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
         />
         <button
           type="submit"
           disabled={loading}
-          className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
+          className="w-full px-4 py-3 bg-gradient-to-r from-violet-500 to-fuchsia-600 text-white rounded-xl font-semibold hover:from-violet-400 hover:to-fuchsia-500 transition-all shadow-lg shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {loading ? "処理中..." : isSignUp ? "アカウント作成" : "ログイン"}
         </button>
@@ -153,7 +164,7 @@ function LoginForm() {
         <button
           type="button"
           onClick={() => setIsSignUp(!isSignUp)}
-          className="text-blue-500 hover:underline"
+          className="text-violet-400 hover:text-violet-300 transition-colors"
         >
           {isSignUp ? "ログインに戻る" : "アカウント作成"}
         </button>
@@ -161,31 +172,35 @@ function LoginForm() {
           type="button"
           onClick={handleOtpLogin}
           disabled={loading}
-          className="text-blue-500 hover:underline disabled:opacity-50"
+          className="text-violet-400 hover:text-violet-300 transition-colors disabled:opacity-50"
         >
           メールリンクでログイン
         </button>
       </div>
 
       {message && (
-        <p className={`text-center text-sm ${message.includes("エラー") ? "text-red-500" : "text-green-600"}`}>
+        <div className={`text-center text-sm px-4 py-3 rounded-xl ${
+          message.includes("エラー") 
+            ? "bg-red-500/10 text-red-400 border border-red-500/20" 
+            : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+        }`}>
           {message}
-        </p>
+        </div>
       )}
 
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300"></div>
+          <div className="w-full border-t border-white/[0.08]"></div>
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-[var(--background)] text-[var(--muted-foreground)]">または</span>
+          <span className="px-3 bg-[#0a0a0b] text-white/30">または</span>
         </div>
       </div>
 
       <button
         type="button"
         onClick={handleGoogleLogin}
-        className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-700 border border-gray-300 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+        className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white/[0.02] border border-white/[0.08] text-white rounded-xl font-medium hover:bg-white/[0.04] hover:border-white/[0.12] transition-all"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
@@ -213,13 +228,20 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-[#0a0a0b] text-white flex flex-col items-center justify-center p-4">
+      {/* Background gradient */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f12] to-[#0a0a0b]" />
+      </div>
+      
       <Suspense fallback={
-        <div className="w-full max-w-sm text-center">
-          <p className="text-[var(--muted-foreground)]">読み込み中...</p>
+        <div className="w-full max-w-sm text-center relative z-10">
+          <p className="text-white/50">読み込み中...</p>
         </div>
       }>
-        <LoginForm />
+        <div className="relative z-10">
+          <LoginForm />
+        </div>
       </Suspense>
     </div>
   );

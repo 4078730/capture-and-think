@@ -14,16 +14,19 @@ bucket（指定あれば）: {bucket}
 ## タスク
 以下の項目を推定してJSONで出力してください。
 
-1. bucket: work / video / life / boardgame のいずれか
+1. bucket: management / rfa / cxc / paper / video / life / game のいずれか
    - 指定がある場合はそれを使用
    - 指定がない場合は内容から推定
 
 2. category: 日本語の短いラベル（例：動画ネタ、技術メモ、観たい、買いたい）
    - bucket別のカテゴリヒント:
+     - management: 管理タスク, プロジェクト管理, スケジュール, 会議メモ
+     - rfa: RFAメモ, 調整メモ, 実験メモ, 企画案, TODO候補, 技術メモ
+     - cxc: CXC関連メモ, 技術メモ, 実験メモ
+     - paper: 論文関連, 研究メモ, 文献メモ, 読書メモ
      - video: 動画ネタ, 演出案, キャラ案, 編集メモ, 投稿文案
-     - work: RFAメモ, 調整メモ, 実験メモ, 企画案, TODO候補, 技術メモ
-     - boardgame: ゲームアイデア, ルール案, コンポーネント, テストメモ
      - life: 観たい, 買いたい, 行きたい, 学習メモ, 雑メモ
+     - game: ゲームアイデア, ルール案, コンポーネント, テストメモ
 
 3. kind: idea / task / note / reference のいずれか
    - idea: アイデア、企画、やりたいこと
@@ -69,10 +72,13 @@ const ENHANCED_TRIAGE_PROMPT = `あなたはメモ・タスク管理のエキス
 4. **URL整理**: 入力内のURLを抽出してリスト化
 
 ### bucket分類ルール
-- work: 仕事関連（RFA、ロボット、技術など）
+- management: 管理・プロジェクト管理関連
+- rfa: RFA関連（ロボット、技術など）
+- cxc: CXC関連
+- paper: 論文・研究関連
 - video: 動画制作関連（ネタ、演出、編集など）
 - life: 生活全般（観たい、買いたい、映画、本など）
-- boardgame: ボードゲーム関連
+- game: ゲーム関連
 
 ### kind分類ルール
 - task: 具体的なアクションが必要なもの（〜する、〜を確認）

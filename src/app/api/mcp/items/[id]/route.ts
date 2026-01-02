@@ -3,12 +3,28 @@ import { createServiceClient } from "@/lib/supabase/server";
 import { authenticateMCPRequest } from "@/lib/mcp-auth";
 import { z } from "zod";
 
+const adfDocumentSchema = z.object({
+  version: z.literal(1),
+  type: z.literal("doc"),
+  content: z.array(z.any()),
+});
+
+const subtaskSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  completed: z.boolean(),
+  created_at: z.string(),
+});
+
 const updateItemSchema = z.object({
-  body: z.string().min(1).optional(),
-  bucket: z.string().optional(),
+  body: z.string().optional(),
+  bucket: z.string().nullable().optional(),
   pinned: z.boolean().optional(),
   due_date: z.string().nullable().optional(),
   memo: z.string().nullable().optional(),
+  summary: z.string().nullable().optional(),
+  adf_content: adfDocumentSchema.nullable().optional(),
+  subtasks: z.array(subtaskSchema).optional(),
 });
 
 // GET - Get single item

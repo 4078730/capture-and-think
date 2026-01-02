@@ -24,6 +24,105 @@ import { adfToPlainText, plainTextToADF } from "@/lib/adf";
 import { RichEditor, MediaToolbar, SelectionToolbar } from "@/components/rich-editor";
 
 // ============================================
+// Task Item Component
+// ============================================
+
+interface TaskItemProps {
+  task: Subtask;
+  onToggle: () => void;
+  onDelete: () => void;
+  onUpdate: (text: string) => void;
+}
+
+function TaskItem({ task, onToggle, onDelete, onUpdate }: TaskItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(task.text);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    if (editText.trim()) {
+      onUpdate(editText.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleSave();
+    } else if (e.key === "Escape") {
+      setEditText(task.text);
+      setIsEditing(false);
+    }
+  };
+
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-3 p-3 rounded-lg transition-all group",
+        task.completed
+          ? "bg-white/[0.01]"
+          : "bg-white/[0.02] hover:bg-white/[0.04]"
+      )}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className={cn(
+          "w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all",
+          task.completed
+            ? "bg-violet-500/20 border-violet-500/40"
+            : "border-white/20 hover:border-violet-400"
+        )}
+      >
+        {task.completed && (
+          <Check className="w-3 h-3 text-violet-400" strokeWidth={3} />
+        )}
+      </button>
+      {isEditing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="flex-1 text-[14px] bg-white/[0.05] border border-white/[0.1] rounded px-2 py-1 text-white/90 focus:outline-none focus:ring-2 focus:ring-violet-500/50"
+        />
+      ) : (
+        <span
+          className={cn(
+            "flex-1 text-[14px] cursor-text",
+            task.completed ? "text-white/30 line-through" : "text-white/70"
+          )}
+          onDoubleClick={() => setIsEditing(true)}
+        >
+          {task.text}
+        </span>
+      )}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onDelete();
+        }}
+        className="opacity-0 group-hover:opacity-100 p-1 text-white/20 hover:text-rose-400 transition-all"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </div>
+  );
+}
+
+// ============================================
 // Types
 // ============================================
 
@@ -43,10 +142,13 @@ type SaveStatus = "idle" | "saving" | "saved";
 // ============================================
 
 const bucketColors: Record<Bucket | "default", { bg: string; dot: string; glow: string; text: string }> = {
-  work: { bg: "bg-blue-500", dot: "bg-blue-400", glow: "shadow-blue-500/50", text: "text-blue-400" },
+  management: { bg: "bg-slate-500", dot: "bg-slate-400", glow: "shadow-slate-500/50", text: "text-slate-400" },
+  rfa: { bg: "bg-blue-500", dot: "bg-blue-400", glow: "shadow-blue-500/50", text: "text-blue-400" },
+  cxc: { bg: "bg-cyan-500", dot: "bg-cyan-400", glow: "shadow-cyan-500/50", text: "text-cyan-400" },
+  paper: { bg: "bg-yellow-500", dot: "bg-yellow-400", glow: "shadow-yellow-500/50", text: "text-yellow-400" },
   video: { bg: "bg-rose-500", dot: "bg-rose-400", glow: "shadow-rose-500/50", text: "text-rose-400" },
   life: { bg: "bg-emerald-500", dot: "bg-emerald-400", glow: "shadow-emerald-500/50", text: "text-emerald-400" },
-  boardgame: { bg: "bg-amber-500", dot: "bg-amber-400", glow: "shadow-amber-500/50", text: "text-amber-400" },
+  game: { bg: "bg-amber-500", dot: "bg-amber-400", glow: "shadow-amber-500/50", text: "text-amber-400" },
   default: { bg: "bg-violet-500", dot: "bg-violet-400", glow: "shadow-violet-500/50", text: "text-violet-400" },
 };
 
@@ -71,11 +173,28 @@ export function NoteDetailView({
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [selection, setSelection] = useState<{ text: string; range: Range } | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   const editorRef = useRef<HTMLDivElement>(null);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previousItemIdRef = useRef<string | null>(null);
 
   const color = bucketColors[item.bucket || "default"] || bucketColors.default;
+
+  // Update internal state when item prop changes (e.g., when selecting a different note)
+  useEffect(() => {
+    // Only update if the item ID has changed (different note selected)
+    // This prevents overwriting user edits when the same item is updated from the server
+    if (previousItemIdRef.current !== item.id) {
+      setTitle(item.summary || "");
+      setAdfContent(item.adf_content || (item.body ? plainTextToADF(item.body) : null));
+      setSubtasks(item.subtasks || []);
+      setSaveStatus("idle");
+      setSelection(null);
+      setIsEditing(false);
+      previousItemIdRef.current = item.id;
+    }
+  }, [item.id]); // Only depend on item.id to prevent overwriting edits
 
   // Auto-save on content change
   const saveChanges = useCallback(async () => {
@@ -160,6 +279,7 @@ export function NoteDetailView({
   // Handle content change
   const handleContentChange = useCallback((doc: ADFDocument) => {
     setAdfContent(doc);
+    setIsEditing(true);
   }, []);
 
   // Handle file upload for media toolbar
@@ -197,16 +317,18 @@ export function NoteDetailView({
   }, []);
 
   return (
-    <div className={cn("fixed inset-0 bg-[#09090b] z-50", className)}>
-      {/* Ambient glow */}
+    <div className={cn("relative h-full w-full bg-[#0a0a0b] flex flex-col", className)}>
+      {/* Ambient glow - more subtle and positioned better */}
       <div
         className={cn(
-          "fixed top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] rounded-full blur-[120px] opacity-20 pointer-events-none",
+          "fixed top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[400px] rounded-full blur-[150px] opacity-10 pointer-events-none transition-opacity duration-1000",
           color.bg
         )}
       />
+      {/* Additional subtle gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.01] to-transparent pointer-events-none" />
 
-      <div className="h-full flex">
+      <div className="relative h-full flex w-full min-w-0 z-10">
         {/* Sidebar */}
         <aside
           onClick={onClose}
@@ -288,11 +410,18 @@ export function NoteDetailView({
                   .map((task) => (
                     <div
                       key={task.id}
-                      className="p-2.5 -mx-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all group"
+                      className="p-2.5 -mx-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all group cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleSubtask(task.id);
+                      }}
                     >
                       <div className="flex items-start gap-2.5">
                         <button
-                          onClick={() => handleToggleSubtask(task.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleSubtask(task.id);
+                          }}
                           className="mt-0.5 w-[16px] h-[16px] rounded-md border-2 border-white/15 hover:border-violet-400 transition-all flex-shrink-0 flex items-center justify-center"
                         >
                           <Check className="w-2 h-2 text-violet-400 opacity-0 group-hover:opacity-50 transition-opacity" />
@@ -307,16 +436,23 @@ export function NoteDetailView({
                 {/* Completed tasks */}
                 {subtasks.filter((t) => t.completed).length > 0 && (
                   <div className="pt-2 mt-2 border-t border-white/[0.04]">
-                    <p className="text-[9px] text-white/20 mb-1.5">Completed</p>
+                    <p className="text-[9px] text-white/20 mb-1.5 uppercase">Completed</p>
                     {subtasks
                       .filter((t) => t.completed)
                       .map((task) => (
                         <div
                           key={task.id}
-                          className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded hover:bg-white/[0.02] transition-all"
+                          className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded hover:bg-white/[0.02] transition-all cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleSubtask(task.id);
+                          }}
                         >
                           <button
-                            onClick={() => handleToggleSubtask(task.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleSubtask(task.id);
+                            }}
                             className="w-[14px] h-[14px] rounded bg-violet-500/20 border border-violet-500/30 flex items-center justify-center"
                           >
                             <Check className="w-2 h-2 text-violet-400" strokeWidth={3} />
@@ -330,9 +466,10 @@ export function NoteDetailView({
                 )}
 
                 {subtasks.length === 0 && (
-                  <p className="text-[11px] text-white/20 py-3 text-center">
-                    Select text to create tasks
-                  </p>
+                  <div className="text-center py-4">
+                    <p className="text-[11px] text-white/20 mb-1">タスクがありません</p>
+                    <p className="text-[10px] text-white/15">メインエディタ下部の「Add task」ボタンから追加できます</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -343,9 +480,9 @@ export function NoteDetailView({
         </aside>
 
         {/* Main Editor */}
-        <main className="flex-1 flex flex-col min-w-0">
+        <main className="flex-1 flex flex-col min-w-0 bg-transparent">
           {/* Header */}
-          <header className="flex items-center justify-between px-4 py-2 border-b border-white/[0.04]">
+          <header className="flex items-center justify-between px-6 py-3 border-b border-white/[0.06] bg-[#09090b]/30 backdrop-blur-sm">
             <div className="flex items-center gap-2">
               {/* Mobile back button */}
               <button
@@ -443,14 +580,14 @@ export function NoteDetailView({
 
           {/* Editor content */}
           <div
-            className="flex-1 overflow-auto"
+            className="flex-1 overflow-auto bg-gradient-to-br from-[#0a0a0b] via-[#09090b] to-[#0a0a0b]"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 onClose();
               }
             }}
           >
-            <div className="max-w-2xl mx-auto px-6 lg:px-8 py-12">
+            <div className="max-w-5xl mx-auto px-8 lg:px-12 xl:px-16 py-12">
               {/* Color indicator */}
               <div className="flex items-center gap-3 mb-6" onClick={(e) => e.stopPropagation()}>
                 <div className={cn("w-3 h-3 rounded-full shadow-lg", color.dot, color.glow)} />
@@ -463,9 +600,13 @@ export function NoteDetailView({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  setIsEditing(true);
+                }}
+                onBlur={() => setIsEditing(false)}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full text-[32px] font-bold bg-transparent outline-none placeholder:text-white/10 text-white/95 leading-tight tracking-tight"
+                className="w-full text-[36px] lg:text-[42px] font-bold bg-transparent outline-none placeholder:text-white/10 text-white/95 leading-tight tracking-tight mb-2"
                 placeholder="Untitled"
               />
 
@@ -473,7 +614,10 @@ export function NoteDetailView({
               <div className="mt-8" onClick={(e) => e.stopPropagation()}>
                 <RichEditor
                   value={adfContent}
-                  onChange={handleContentChange}
+                  onChange={(newContent) => {
+                    handleContentChange(newContent);
+                    setIsEditing(true);
+                  }}
                   onTextSelect={handleTextSelect}
                   onImageUpload={onImageUpload}
                   onImageClick={setLightboxImage}
@@ -488,86 +632,95 @@ export function NoteDetailView({
                 onLinkAdd={handleLinkAdd}
               />
 
-              {/* Inline Task Section */}
-              {subtasks.length > 0 && (
-                <div className="mt-12 pt-8 border-t border-white/[0.06]">
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", color.bg)}>
-                        <Check className={cn("w-4 h-4", "text-white")} />
-                      </div>
-                      <div>
-                        <h4 className="text-[15px] font-semibold text-white/90">Tasks</h4>
-                        <p className="text-[12px] text-white/30">
-                          {subtasks.filter((t) => t.completed).length} / {subtasks.length} completed
-                        </p>
-                      </div>
+              {/* Task Section - Always visible */}
+              <div className="mt-12 pt-8 border-t border-white/[0.06]">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", color.bg)}>
+                      <Check className={cn("w-4 h-4", "text-white")} />
                     </div>
-                    <button
-                      onClick={() => {
-                        const newSubtask: Subtask = {
-                          id: `st-${Date.now()}`,
-                          text: "New task",
-                          completed: false,
-                          created_at: new Date().toISOString(),
-                        };
-                        setSubtasks((prev) => [...prev, newSubtask]);
-                      }}
-                      className="flex items-center gap-2 px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] rounded-lg transition-all"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      Add task
-                    </button>
+                    <div>
+                      <h4 className="text-[15px] font-semibold text-white/90">Tasks</h4>
+                      <p className="text-[12px] text-white/30">
+                        {subtasks.length > 0
+                          ? `${subtasks.filter((t) => t.completed).length} / ${subtasks.length} completed`
+                          : "タスクを追加してください"}
+                      </p>
+                    </div>
                   </div>
-
-                  <div className="space-y-2">
-                    {subtasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={cn(
-                          "flex items-center gap-3 p-3 rounded-lg transition-all group",
-                          task.completed
-                            ? "bg-white/[0.01]"
-                            : "bg-white/[0.02] hover:bg-white/[0.04]"
-                        )}
-                      >
-                        <button
-                          onClick={() => handleToggleSubtask(task.id)}
-                          className={cn(
-                            "w-5 h-5 rounded-md border-2 flex-shrink-0 flex items-center justify-center transition-all",
-                            task.completed
-                              ? "bg-violet-500/20 border-violet-500/40"
-                              : "border-white/20 hover:border-violet-400"
-                          )}
-                        >
-                          {task.completed && (
-                            <Check className="w-3 h-3 text-violet-400" strokeWidth={3} />
-                          )}
-                        </button>
-                        <span
-                          className={cn(
-                            "flex-1 text-[14px]",
-                            task.completed ? "text-white/30 line-through" : "text-white/70"
-                          )}
-                        >
-                          {task.text}
-                        </span>
-                        <button
-                          onClick={() => handleDeleteSubtask(task.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1 text-white/20 hover:text-rose-400 transition-all"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const newSubtask: Subtask = {
+                        id: `st-${Date.now()}`,
+                        text: "新しいタスク",
+                        completed: false,
+                        created_at: new Date().toISOString(),
+                      };
+                      setSubtasks((prev) => [...prev, newSubtask]);
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] rounded-lg transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    Add task
+                  </button>
                 </div>
-              )}
+
+                {subtasks.length > 0 ? (
+                  <div className="space-y-2">
+                    {subtasks
+                      .filter((t) => !t.completed)
+                      .map((task) => (
+                        <TaskItem
+                          key={task.id}
+                          task={task}
+                          onToggle={() => handleToggleSubtask(task.id)}
+                          onDelete={() => handleDeleteSubtask(task.id)}
+                          onUpdate={(text) => {
+                            setSubtasks((prev) =>
+                              prev.map((t) => (t.id === task.id ? { ...t, text } : t))
+                            );
+                          }}
+                        />
+                      ))}
+
+                    {subtasks.filter((t) => t.completed).length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-white/[0.06]">
+                        <p className="text-[11px] text-white/30 mb-3 uppercase tracking-wider">
+                          Completed ({subtasks.filter((t) => t.completed).length})
+                        </p>
+                        <div className="space-y-2">
+                          {subtasks
+                            .filter((t) => t.completed)
+                            .map((task) => (
+                              <TaskItem
+                                key={task.id}
+                                task={task}
+                                onToggle={() => handleToggleSubtask(task.id)}
+                                onDelete={() => handleDeleteSubtask(task.id)}
+                                onUpdate={(text) => {
+                                  setSubtasks((prev) =>
+                                    prev.map((t) => (t.id === task.id ? { ...t, text } : t))
+                                  );
+                                }}
+                              />
+                            ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-white/30">
+                    <p className="text-[13px] mb-2">タスクがありません</p>
+                    <p className="text-[11px] text-white/20">「Add task」ボタンをクリックして追加してください</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
           {/* Footer */}
-          <footer className="px-6 py-3 border-t border-white/[0.04] flex items-center justify-between bg-[#09090b]/50">
+          <footer className="px-6 py-3 border-t border-white/[0.06] flex items-center justify-between bg-[#09090b]/30 backdrop-blur-sm">
             <div className="flex items-center gap-4 text-[11px] text-white/20">
               <span>{adfContent ? adfToPlainText(adfContent).length : 0} chars</span>
               <span className="w-1 h-1 rounded-full bg-white/10" />

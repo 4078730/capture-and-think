@@ -22,7 +22,14 @@ interface Note {
   updatedAt: string;
 }
 
-const fetcher = (url: string) => fetch(url).then(res => res.json());
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const error = new Error('Failed to fetch notes');
+    throw error;
+  }
+  return res.json();
+};
 
 function itemToNote(item: Item): Note {
   return {
@@ -49,8 +56,16 @@ export function SimpleNotesList({ showArchived, selectedNoteId, onSelectNote }: 
 
   const notes: Note[] = data?.items?.map(itemToNote) || [];
 
+  // Debug info
+  console.log('[SimpleNotesList] isLoading:', isLoading, 'error:', error, 'notes:', notes.length, 'data:', data);
+
   return (
-    <div className="flex-1 overflow-y-auto p-2">
+    <div className="flex-1 overflow-y-auto p-2 bg-zinc-900">
+      {/* Debug bar */}
+      <div className="mb-2 p-2 bg-blue-900/50 rounded text-xs text-blue-200">
+        Loading: {String(isLoading)} | Notes: {notes.length} | Error: {error ? 'Yes' : 'No'}
+      </div>
+
       {isLoading && (
         <div className="text-center py-8 text-white/50">
           <div className="animate-spin w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full mx-auto mb-2" />
@@ -60,13 +75,13 @@ export function SimpleNotesList({ showArchived, selectedNoteId, onSelectNote }: 
 
       {error && (
         <div className="text-center py-8 text-red-400">
-          Error loading notes
+          Error: {error.message}
         </div>
       )}
 
       {!isLoading && !error && notes.length === 0 && (
         <div className="text-center py-8 text-white/50">
-          No notes
+          No notes found
         </div>
       )}
 

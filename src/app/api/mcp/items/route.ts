@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { parseInput } from "@/lib/parser";
 import { z } from "zod";
 
+const adfDocumentSchema = z.object({
+  version: z.literal(1),
+  type: z.literal("doc"),
+  content: z.array(z.any()),
+});
+
+const subtaskSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  completed: z.boolean(),
+  created_at: z.string(),
+});
+
 const createItemSchema = z.object({
-  body: z.string().min(1),
+  body: z.string(), // 空文字列も許可（新規ノート作成時）
   bucket: z.string().optional(),
   due_date: z.string().optional(), // YYYY-MM-DD format
   memo: z.string().optional(),
+  summary: z.string().nullable().optional(),
+  adf_content: adfDocumentSchema.nullable().optional(),
+  subtasks: z.array(subtaskSchema).optional(),
 });
 
 // GET - List items
@@ -23,19 +40,49 @@ export async function GET(request: NextRequest) {
 
     const status = searchParams.get("status") ?? "active";
     const bucket = searchParams.get("bucket");
+    const category = searchParams.get("category");
+    const pinned = searchParams.get("pinned");
+    const dueDate = searchParams.get("due_date");
+    const sort = searchParams.get("sort") ?? "newest";
     const limit = parseInt(searchParams.get("limit") ?? "20");
     const offset = parseInt(searchParams.get("offset") ?? "0");
 
     let query = supabase
       .from("items")
-      .select("id, body, bucket, category, kind, summary, pinned, due_date, memo, subtasks, created_at, status, triage_state", { count: "exact" })
+      .select("id, body, bucket, category, kind, summary, pinned, due_date, memo, subtasks, adf_content, created_at, status, triage_state", { count: "exact" })
       .eq("user_id", auth.userId!)
       .eq("status", status)
-      .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
     if (bucket) {
       query = query.eq("bucket", bucket);
+    }
+    if (category) {
+      query = query.eq("category", category);
+    }
+    if (pinned === "true") {
+      query = query.eq("pinned", true);
+    }
+    if (dueDate) {
+      query = query.eq("due_date", dueDate);
+    }
+
+    // Apply sorting
+    switch (sort) {
+      case "oldest":
+        query = query.order("created_at", { ascending: true });
+        break;
+      case "due_date":
+        query = query.order("due_date", { ascending: true, nullsFirst: false });
+        break;
+      case "pinned_first":
+        query = query.order("pinned", { ascending: false }).order("created_at", { ascending: false });
+        break;
+      case "bucket":
+        query = query.order("bucket", { ascending: true }).order("created_at", { ascending: false });
+        break;
+      default: // newest
+        query = query.order("created_at", { ascending: false });
     }
 
     const { data, error, count } = await query;
@@ -72,14 +119,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
     }
 
+    // Parse input for hashtags (空文字列の場合は"Untitled"を使用)
+    const inputBody = parsed.data.body.trim() || "Untitled";
+    const { body: parsedBody, bucket: parsedBucket, pinned } = parseInput(inputBody);
+    const body = parsedBody.trim() || "Untitled";
+    const bucket = parsed.data.bucket ?? parsedBucket;
+
     const { data, error } = await supabase
       .from("items")
       .insert({
         user_id: auth.userId,
-        body: parsed.data.body,
-        bucket: parsed.data.bucket,
+        body,
+        bucket,
+        pinned: pinned || false,
         due_date: parsed.data.due_date,
         memo: parsed.data.memo,
+        summary: parsed.data.summary,
+        adf_content: parsed.data.adf_content,
+        subtasks: parsed.data.subtasks,
         source: "mcp",
         triage_state: "pending",
       })

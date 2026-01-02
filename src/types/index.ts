@@ -1,6 +1,6 @@
 import type { ADFDocument } from "@/lib/adf";
 
-export type Bucket = "work" | "video" | "life" | "boardgame";
+export type Bucket = "management" | "rfa" | "cxc" | "paper" | "video" | "life" | "game";
 export type Kind = "idea" | "task" | "note" | "reference" | "unknown";
 export type Status = "active" | "archived";
 export type TriageState = "pending" | "awaiting_approval" | "done" | "failed";
