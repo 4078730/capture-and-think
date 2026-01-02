@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { useItems, useUpdateItem, useCreateItem, useArchiveItem, useUnarchiveItem, usePinItem } from "@/hooks/use-items";
+import { useItems, useUpdateItem, useCreateItem, useArchiveItem, useUnarchiveItem, usePinItem, useDeleteItem } from "@/hooks/use-items";
 import type { Item, Bucket, Subtask } from "@/types";
 
 // Save status type
@@ -1482,6 +1482,7 @@ export default function PrototypePage() {
   const archiveItemMutation = useArchiveItem();
   const unarchiveItemMutation = useUnarchiveItem();
   const pinItemMutation = usePinItem();
+  const deleteItemMutation = useDeleteItem();
 
   // Convert API items to notes
   const notes = useMemo(() => {
@@ -1625,26 +1626,45 @@ export default function PrototypePage() {
     }
   }, [editingMedia.length, addMedia]);
 
-  // ファイル選択処理
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  // ファイル選択処理 - Supabase Storageにアップロード
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && file.type.startsWith("image/")) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
+      try {
+        // FormDataを作成してAPIに送信
+        const formData = new FormData();
+        formData.append("file", file);
+        if (selectedNote?.id) {
+          formData.append("item_id", selectedNote.id);
+        }
+
+        const response = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "Upload failed");
+        }
+
+        const { url } = await response.json();
         const newMedia: EmbeddedMedia = {
           id: `m-${Date.now()}`,
           type: "image",
-          url: dataUrl,
+          url,
           title: file.name,
           position: editingMedia.length,
         };
         addMedia(newMedia);
-      };
-      reader.readAsDataURL(file);
+        toast.success("画像をアップロードしました");
+      } catch (err) {
+        console.error("Image upload failed:", err);
+        toast.error("画像のアップロードに失敗しました");
+      }
     }
     e.target.value = "";
-  }, [editingMedia.length, addMedia]);
+  }, [editingMedia.length, addMedia, selectedNote?.id]);
 
   // メディア追加（モーダルから）
   const handleAddMedia = useCallback(() => {
@@ -1713,6 +1733,20 @@ export default function PrototypePage() {
       toast.error("操作に失敗しました");
     }
   }, [pinItemMutation]);
+
+  // 削除
+  const handleDeleteNote = useCallback(async (noteId: string) => {
+    try {
+      await deleteItemMutation.mutateAsync(noteId);
+      if (selectedNote?.id === noteId) {
+        setSelectedNote(null);
+      }
+      toast.success("ノートを削除しました");
+    } catch (err) {
+      console.error("Delete failed:", err);
+      toast.error("削除に失敗しました");
+    }
+  }, [deleteItemMutation, selectedNote]);
 
   // オートセーブ
   useEffect(() => {
@@ -2325,42 +2359,46 @@ export default function PrototypePage() {
                 </div>
 
                 {/* Inline Task Management Section - Hierarchical */}
-                {tasks.filter(t => t.noteId === selectedNote.id).length > 0 && (
-                  <div className="mt-12 pt-8 border-t border-white/[0.06]">
-                    <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-3">
-                        <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", color.bg)}>
-                          <Check className={cn("w-4 h-4", color.text)} />
-                        </div>
-                        <div>
-                          <h4 className="text-[15px] font-semibold text-white/90">タスク管理</h4>
-                          <p className="text-[12px] text-white/30">
-                            {tasks.filter(t => t.noteId === selectedNote.id && t.completed).length} / {tasks.filter(t => t.noteId === selectedNote.id).length} 完了
-                          </p>
-                        </div>
+                <div className="mt-12 pt-8 border-t border-white/[0.06]">
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center", color.bg)}>
+                        <Check className={cn("w-4 h-4", color.text)} />
                       </div>
-                      <button
-                        onClick={() => {
-                          const newTask: Task = {
-                            id: `t${Date.now()}`,
-                            title: "新しいタスク",
-                            noteId: selectedNote.id,
-                            dueDate: null,
-                            completed: false,
-                            memo: "",
-                            parentId: null,
-                            depth: 0,
-                          };
-                          setTasks([...tasks, newTask]);
-                        }}
-                        className="flex items-center gap-2 px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] rounded-lg transition-all"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        タスク追加
-                      </button>
+                      <div>
+                        <h4 className="text-[15px] font-semibold text-white/90">タスク管理</h4>
+                        <p className="text-[12px] text-white/30">
+                          {tasks.filter(t => t.noteId === selectedNote.id).length > 0
+                            ? `${tasks.filter(t => t.noteId === selectedNote.id && t.completed).length} / ${tasks.filter(t => t.noteId === selectedNote.id).length} 完了`
+                            : "タスクはありません"
+                          }
+                        </p>
+                      </div>
                     </div>
+                    <button
+                      onClick={() => {
+                        const newTask: Task = {
+                          id: `t${Date.now()}`,
+                          title: "新しいタスク",
+                          noteId: selectedNote.id,
+                          dueDate: null,
+                          completed: false,
+                          memo: "",
+                          parentId: null,
+                          depth: 0,
+                        };
+                        setTasks([...tasks, newTask]);
+                        toast.success("タスクを追加しました");
+                      }}
+                      className="flex items-center gap-2 px-3 py-2 text-[12px] text-white/40 hover:text-white/70 hover:bg-white/[0.04] rounded-lg transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      タスク追加
+                    </button>
+                  </div>
 
-                    {/* Hierarchical Task List */}
+                  {/* Hierarchical Task List */}
+                  {tasks.filter(t => t.noteId === selectedNote.id).length > 0 ? (
                     <div className="space-y-1">
                       {getRootTasks(tasks, selectedNote.id).map(task => (
                         <HierarchicalTaskItem
@@ -2377,8 +2415,15 @@ export default function PrototypePage() {
                         />
                       ))}
                     </div>
-                  </div>
-                )}
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                      <div className="w-12 h-12 rounded-2xl bg-white/[0.02] flex items-center justify-center mb-3">
+                        <Check className="w-6 h-6 text-white/20" />
+                      </div>
+                      <p className="text-[13px] text-white/30">タスクを追加して進捗を管理しましょう</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -2419,11 +2464,21 @@ export default function PrototypePage() {
                 <span>Last saved {selectedNote.updatedAt}</span>
               </div>
               <div className="flex items-center gap-1">
-                <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-white/25 hover:text-white/50 hover:bg-white/[0.04] rounded-lg transition-all">
-                  <Archive className="w-3.5 h-3.5" />
-                  Archive
+                <button
+                  onClick={() => handleArchiveNote(selectedNote.id, selectedNote.archived)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-white/25 hover:text-white/50 hover:bg-white/[0.04] rounded-lg transition-all"
+                >
+                  {selectedNote.archived ? <ArchiveRestore className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
+                  {selectedNote.archived ? "Unarchive" : "Archive"}
                 </button>
-                <button className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-white/25 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all">
+                <button
+                  onClick={() => {
+                    if (confirm("このノートを削除しますか？この操作は取り消せません。")) {
+                      handleDeleteNote(selectedNote.id);
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-white/25 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                >
                   <Trash2 className="w-3.5 h-3.5" />
                   Delete
                 </button>
@@ -3042,23 +3097,33 @@ export default function PrototypePage() {
       {/* Mobile nav */}
       <nav className="fixed bottom-0 inset-x-0 bg-[#09090b]/95 backdrop-blur-2xl border-t border-white/[0.04] px-4 py-2 lg:hidden z-20 safe-area-pb">
         <div className="flex justify-around max-w-md mx-auto">
-          {[
-            { icon: Hash, label: "Notes", active: true },
-            { icon: Check, label: "Tasks", active: false },
-            { icon: Plus, label: "New", active: false, special: true },
-          ].map(({ icon: Icon, label, active, special }) => (
-            <button key={label} className={cn(
+          <button
+            onClick={() => { setSelectedNote(null); setShowArchived(false); }}
+            className={cn(
               "flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all duration-200",
-              special
-                ? "bg-gradient-to-t from-violet-600 to-violet-500 text-white shadow-lg shadow-violet-500/30"
-                : active
-                  ? "text-white bg-white/[0.06]"
-                  : "text-white/35 hover:text-white/60"
-            )}>
-              <Icon className={cn("w-5 h-5", special && "drop-shadow-sm")} />
-              <span className={cn("text-[10px] font-medium", special && "font-semibold")}>{label}</span>
-            </button>
-          ))}
+              !selectedNote && !showArchived ? "text-white bg-white/[0.06]" : "text-white/35 hover:text-white/60"
+            )}
+          >
+            <Hash className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Notes</span>
+          </button>
+          <button
+            onClick={() => { setSelectedNote(null); setShowArchived(true); }}
+            className={cn(
+              "flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all duration-200",
+              showArchived ? "text-white bg-white/[0.06]" : "text-white/35 hover:text-white/60"
+            )}
+          >
+            <Archive className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Archive</span>
+          </button>
+          <button
+            onClick={handleCreateNote}
+            className="flex flex-col items-center gap-1 px-5 py-2 rounded-2xl transition-all duration-200 bg-gradient-to-t from-violet-600 to-violet-500 text-white shadow-lg shadow-violet-500/30"
+          >
+            <Plus className="w-5 h-5 drop-shadow-sm" />
+            <span className="text-[10px] font-semibold">New</span>
+          </button>
         </div>
       </nav>
 
@@ -3169,7 +3234,16 @@ export default function PrototypePage() {
                     <Check className="w-4 h-4" />
                     {selectedTask.completed ? "未完了に戻す" : "完了にする"}
                   </button>
-                  <button className="p-2.5 text-white/30 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all">
+                  <button
+                    onClick={() => {
+                      if (confirm("このタスクを削除しますか？")) {
+                        setTasks(prev => prev.filter(t => t.id !== selectedTask.id && t.parentId !== selectedTask.id));
+                        setSelectedTask(null);
+                        toast.success("タスクを削除しました");
+                      }
+                    }}
+                    className="p-2.5 text-white/30 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
