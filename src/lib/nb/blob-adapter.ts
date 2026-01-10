@@ -1,5 +1,4 @@
-import * as fs from "fs/promises";
-import * as path from "path";
+import { put, list as blobList, del, head } from "@vercel/blob";
 import { v4 as uuidv4 } from "uuid";
 import type { Item } from "@/types";
 import type {
@@ -17,46 +16,43 @@ import {
   generateFilename,
 } from "./markdown";
 
-const NB_DIR = process.env.NB_DIR || path.join(process.cwd(), "data/notes");
-const ACTIVE_DIR = path.join(NB_DIR, "home");
-const ARCHIVED_DIR = path.join(NB_DIR, "archived");
+const BLOB_PREFIX = "notes/";
 
-async function ensureDirectories(): Promise<void> {
-  await fs.mkdir(ACTIVE_DIR, { recursive: true });
-  await fs.mkdir(ARCHIVED_DIR, { recursive: true });
+function getPath(status: "active" | "archived", filename: string): string {
+  return `${BLOB_PREFIX}${status}/${filename}`;
 }
 
-async function getAllFiles(dir: string): Promise<string[]> {
+async function getAllBlobs(status: "active" | "archived"): Promise<{ url: string; pathname: string }[]> {
   try {
-    const entries = await fs.readdir(dir, { withFileTypes: true });
-    return entries
-      .filter((e) => e.isFile() && e.name.endsWith(".md"))
-      .map((e) => path.join(dir, e.name));
-  } catch {
+    const prefix = `${BLOB_PREFIX}${status}/`;
+    const result = await blobList({ prefix });
+    return result.blobs.filter((b) => b.pathname.endsWith(".md"));
+  } catch (error) {
+    console.error("Error listing blobs:", error);
     return [];
   }
 }
 
-async function readNote(filepath: string): Promise<Item | null> {
+async function readNote(blob: { url: string; pathname: string }): Promise<Item | null> {
   try {
-    const content = await fs.readFile(filepath, "utf-8");
-    const filename = path.basename(filepath);
-    const raw = parseMarkdown(content, filename, filepath);
+    const response = await fetch(blob.url);
+    const content = await response.text();
+    const filename = blob.pathname.split("/").pop() || "";
+    const raw = parseMarkdown(content, filename, blob.pathname);
     return rawNoteToItem(raw);
-  } catch {
+  } catch (error) {
+    console.error("Error reading note:", error);
     return null;
   }
 }
 
 export async function list(options: ListNotesOptions = {}): Promise<NotesResponse> {
-  await ensureDirectories();
-
-  const dir = options.status === "archived" ? ARCHIVED_DIR : ACTIVE_DIR;
-  const files = await getAllFiles(dir);
+  const status = options.status || "active";
+  const blobs = await getAllBlobs(status);
 
   let items: Item[] = [];
-  for (const filepath of files) {
-    const item = await readNote(filepath);
+  for (const blob of blobs) {
+    const item = await readNote(blob);
     if (item) items.push(item);
   }
 
@@ -90,33 +86,30 @@ export async function list(options: ListNotesOptions = {}): Promise<NotesRespons
 }
 
 export async function get(id: string): Promise<Item | null> {
-  await ensureDirectories();
-
-  for (const dir of [ACTIVE_DIR, ARCHIVED_DIR]) {
-    const files = await getAllFiles(dir);
-    for (const filepath of files) {
-      const item = await readNote(filepath);
+  for (const status of ["active", "archived"] as const) {
+    const blobs = await getAllBlobs(status);
+    for (const blob of blobs) {
+      const item = await readNote(blob);
       if (item?.id === id) return item;
     }
   }
   return null;
 }
 
-async function findFilePath(id: string): Promise<string | null> {
-  for (const dir of [ACTIVE_DIR, ARCHIVED_DIR]) {
-    const files = await getAllFiles(dir);
-    for (const filepath of files) {
-      const content = await fs.readFile(filepath, "utf-8");
-      const raw = parseMarkdown(content, path.basename(filepath), filepath);
-      if (raw.frontmatter.id === id) return filepath;
+async function findBlobPath(id: string): Promise<{ url: string; pathname: string; status: "active" | "archived" } | null> {
+  for (const status of ["active", "archived"] as const) {
+    const blobs = await getAllBlobs(status);
+    for (const blob of blobs) {
+      const item = await readNote(blob);
+      if (item?.id === id) {
+        return { ...blob, status };
+      }
     }
   }
   return null;
 }
 
 export async function create(input: CreateNoteInput): Promise<Item> {
-  await ensureDirectories();
-
   const id = uuidv4();
   const now = new Date().toISOString();
 
@@ -138,20 +131,25 @@ export async function create(input: CreateNoteInput): Promise<Item> {
   });
 
   const filename = generateFilename(id, now);
-  const filepath = path.join(ACTIVE_DIR, filename);
+  const pathname = getPath("active", filename);
   const content = serializeToMarkdown(frontmatter, input.body);
 
-  await fs.writeFile(filepath, content, "utf-8");
+  await put(pathname, content, {
+    access: "public",
+    contentType: "text/markdown",
+  });
 
   return (await get(id))!;
 }
 
 export async function update(id: string, data: UpdateNoteInput): Promise<Item | null> {
-  const filepath = await findFilePath(id);
-  if (!filepath) return null;
+  const blobInfo = await findBlobPath(id);
+  if (!blobInfo) return null;
 
-  const existingContent = await fs.readFile(filepath, "utf-8");
-  const raw = parseMarkdown(existingContent, path.basename(filepath), filepath);
+  const response = await fetch(blobInfo.url);
+  const existingContent = await response.text();
+  const filename = blobInfo.pathname.split("/").pop() || "";
+  const raw = parseMarkdown(existingContent, filename, blobInfo.pathname);
   const existingItem = rawNoteToItem(raw);
 
   const updatedItem: Item = {
@@ -164,16 +162,20 @@ export async function update(id: string, data: UpdateNoteInput): Promise<Item | 
   const frontmatter = itemToFrontmatter(updatedItem);
   const content = serializeToMarkdown(frontmatter, updatedItem.body);
 
-  await fs.writeFile(filepath, content, "utf-8");
+  await del(blobInfo.url);
+  await put(blobInfo.pathname, content, {
+    access: "public",
+    contentType: "text/markdown",
+  });
 
   return updatedItem;
 }
 
 export async function remove(id: string): Promise<boolean> {
-  const filepath = await findFilePath(id);
-  if (!filepath) return false;
+  const blobInfo = await findBlobPath(id);
+  if (!blobInfo) return false;
 
-  await fs.unlink(filepath);
+  await del(blobInfo.url);
   return true;
 }
 
@@ -186,37 +188,63 @@ export async function unpin(id: string): Promise<Item | null> {
 }
 
 export async function archive(id: string): Promise<Item | null> {
-  const filepath = await findFilePath(id);
-  if (!filepath) return null;
+  const blobInfo = await findBlobPath(id);
+  if (!blobInfo) return null;
 
-  const item = await update(id, { status: "archived" } as UpdateNoteInput);
-  if (!item) return null;
+  const response = await fetch(blobInfo.url);
+  const content = await response.text();
+  const filename = blobInfo.pathname.split("/").pop() || "";
+  const raw = parseMarkdown(content, filename, blobInfo.pathname);
+  const existingItem = rawNoteToItem(raw);
 
-  const filename = path.basename(filepath);
-  const newPath = path.join(ARCHIVED_DIR, filename);
+  const updatedItem: Item = {
+    ...existingItem,
+    status: "archived",
+    updated_at: new Date().toISOString(),
+  };
 
-  const content = await fs.readFile(filepath, "utf-8");
-  await fs.writeFile(newPath, content, "utf-8");
-  await fs.unlink(filepath);
+  const frontmatter = itemToFrontmatter(updatedItem);
+  const newContent = serializeToMarkdown(frontmatter, updatedItem.body);
 
-  return { ...item, status: "archived" };
+  const newPathname = getPath("archived", filename);
+
+  await del(blobInfo.url);
+  await put(newPathname, newContent, {
+    access: "public",
+    contentType: "text/markdown",
+  });
+
+  return updatedItem;
 }
 
 export async function unarchive(id: string): Promise<Item | null> {
-  const filepath = await findFilePath(id);
-  if (!filepath) return null;
+  const blobInfo = await findBlobPath(id);
+  if (!blobInfo) return null;
 
-  const item = await update(id, { status: "active" } as UpdateNoteInput);
-  if (!item) return null;
+  const response = await fetch(blobInfo.url);
+  const content = await response.text();
+  const filename = blobInfo.pathname.split("/").pop() || "";
+  const raw = parseMarkdown(content, filename, blobInfo.pathname);
+  const existingItem = rawNoteToItem(raw);
 
-  const filename = path.basename(filepath);
-  const newPath = path.join(ACTIVE_DIR, filename);
+  const updatedItem: Item = {
+    ...existingItem,
+    status: "active",
+    updated_at: new Date().toISOString(),
+  };
 
-  const content = await fs.readFile(filepath, "utf-8");
-  await fs.writeFile(newPath, content, "utf-8");
-  await fs.unlink(filepath);
+  const frontmatter = itemToFrontmatter(updatedItem);
+  const newContent = serializeToMarkdown(frontmatter, updatedItem.body);
 
-  return { ...item, status: "active" };
+  const newPathname = getPath("active", filename);
+
+  await del(blobInfo.url);
+  await put(newPathname, newContent, {
+    access: "public",
+    contentType: "text/markdown",
+  });
+
+  return updatedItem;
 }
 
 export async function getCategories(bucket?: string): Promise<CategoryCount[]> {
@@ -240,15 +268,13 @@ export async function search(query: string): Promise<Item[]> {
 }
 
 export async function getArchiveCandidates(daysOld: number = 30): Promise<NotesResponse> {
-  await ensureDirectories();
-
-  const files = await getAllFiles(ACTIVE_DIR);
+  const blobs = await getAllBlobs("active");
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
 
   let items: Item[] = [];
-  for (const filepath of files) {
-    const item = await readNote(filepath);
+  for (const blob of blobs) {
+    const item = await readNote(blob);
     if (item && !item.pinned && new Date(item.created_at) < cutoffDate) {
       items.push(item);
     }
@@ -260,13 +286,11 @@ export async function getArchiveCandidates(daysOld: number = 30): Promise<NotesR
 }
 
 export async function getAwaitingApproval(options: { limit?: number; offset?: number } = {}): Promise<NotesResponse> {
-  await ensureDirectories();
-
-  const files = await getAllFiles(ACTIVE_DIR);
+  const blobs = await getAllBlobs("active");
   let items: Item[] = [];
-  
-  for (const filepath of files) {
-    const item = await readNote(filepath);
+
+  for (const blob of blobs) {
+    const item = await readNote(blob);
     if (item && item.triage_state === "awaiting_approval") {
       items.push(item);
     }
@@ -298,7 +322,7 @@ export async function bulkArchive(ids: string[]): Promise<{ success: number; fai
   return { success, failed };
 }
 
-const fileAdapter = {
+export const blobAdapter = {
   list,
   get,
   create,
@@ -314,9 +338,3 @@ const fileAdapter = {
   getAwaitingApproval,
   bulkArchive,
 };
-
-import { blobAdapter } from "./blob-adapter";
-
-const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
-
-export const nbAdapter = useBlob ? blobAdapter : fileAdapter;
