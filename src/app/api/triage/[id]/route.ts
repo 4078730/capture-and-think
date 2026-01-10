@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { triageItem } from "@/lib/ai/triage";
 
 export async function POST(
@@ -8,55 +8,32 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
 
-    // Get item
-    const { data: item, error: fetchError } = await supabase
-      .from("items")
-      .select("*")
-      .eq("id", id)
-      .single();
-
-    if (fetchError || !item) {
+    const item = await nbAdapter.get(id);
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    // Skip if already processed
     if (item.triage_state === "done" || item.triage_state === "awaiting_approval") {
       return NextResponse.json({ message: "Already triaged" });
     }
 
     try {
-      // Run triage
       const result = await triageItem(item.body, item.bucket);
 
-      // Store AI suggestions for user approval (don't apply yet)
-      const { error: updateError } = await supabase
-        .from("items")
-        .update({
-          ai_suggested_bucket: result.bucket,
-          ai_suggested_category: result.category,
-          ai_suggested_kind: result.kind,
-          ai_suggested_summary: result.summary,
-          ai_suggested_tags: result.auto_tags,
-          ai_confidence: result.confidence,
-          triage_state: "awaiting_approval",
-        })
-        .eq("id", id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      await nbAdapter.update(id, {
+        bucket: result.bucket,
+        category: result.category,
+        kind: result.kind,
+        summary: result.summary,
+        auto_tags: result.auto_tags,
+        confidence: result.confidence,
+        triage_state: "awaiting_approval",
+      });
 
       return NextResponse.json({ success: true, result, awaiting_approval: true });
     } catch (triageError) {
-      // Mark as failed
-      await supabase
-        .from("items")
-        .update({
-          triage_state: "failed",
-        })
-        .eq("id", id);
+      await nbAdapter.update(id, { triage_state: "failed" });
 
       console.error("Triage error:", triageError);
       return NextResponse.json(

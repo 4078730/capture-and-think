@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { z } from "zod";
 
 const bulkUpdateSchema = z.object({
@@ -19,8 +19,6 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const supabase = await createServiceClient();
-
     const json = await request.json();
     const parsed = bulkUpdateSchema.safeParse(json);
     if (!parsed.success) {
@@ -42,21 +40,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No valid updates provided" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .update(updateData)
-      .in("id", parsed.data.item_ids)
-      .eq("user_id", auth.userId!)
-      .select("id");
+    let updatedCount = 0;
+    const updatedIds: string[] = [];
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    for (const id of parsed.data.item_ids) {
+      const result = await nbAdapter.update(id, updateData);
+      if (result) {
+        updatedCount++;
+        updatedIds.push(id);
+      }
     }
 
     return NextResponse.json({
       success: true,
-      updated_count: data?.length || 0,
-      item_ids: data?.map((item) => item.id) || [],
+      updated_count: updatedCount,
+      item_ids: updatedIds,
       updates: updateData,
     });
   } catch (error) {
@@ -64,4 +62,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

@@ -49,10 +49,53 @@ function htmlToMarkdown(element: HTMLElement): string {
       content += "_";
       node.childNodes.forEach(processNode);
       content += "_";
-    } else if (node.nodeName === "CODE") {
+    } else if (node.nodeName === "CODE" && (node as HTMLElement).parentElement?.nodeName !== "PRE") {
       content += "`";
       node.childNodes.forEach(processNode);
       content += "`";
+    } else if (node.nodeName === "PRE") {
+      if (content && !content.endsWith("\n")) content += "\n";
+      content += "```\n";
+      const codeEl = (node as HTMLElement).querySelector("code");
+      if (codeEl) {
+        content += codeEl.textContent || "";
+      } else {
+        content += (node as HTMLElement).textContent || "";
+      }
+      if (!content.endsWith("\n")) content += "\n";
+      content += "```\n";
+    } else if (node.nodeName.match(/^H[1-6]$/)) {
+      if (content && !content.endsWith("\n")) content += "\n";
+      const level = parseInt(node.nodeName[1]);
+      content += "#".repeat(level) + " ";
+      node.childNodes.forEach(processNode);
+      content += "\n";
+    } else if (node.nodeName === "UL" || node.nodeName === "OL") {
+      if (content && !content.endsWith("\n")) content += "\n";
+      const listItems = (node as HTMLElement).querySelectorAll(":scope > li");
+      listItems.forEach((li, index) => {
+        const prefix = node.nodeName === "OL" ? `${index + 1}. ` : "- ";
+        content += prefix + (li.textContent || "") + "\n";
+      });
+    } else if (node.nodeName === "BLOCKQUOTE") {
+      if (content && !content.endsWith("\n")) content += "\n";
+      const lines = ((node as HTMLElement).textContent || "").split("\n");
+      lines.forEach((line) => {
+        content += "> " + line + "\n";
+      });
+    } else if (node.nodeName === "HR") {
+      if (content && !content.endsWith("\n")) content += "\n";
+      content += "---\n";
+    } else if (node.nodeName === "DETAILS") {
+      if (content && !content.endsWith("\n")) content += "\n";
+      const summary = (node as HTMLElement).querySelector("summary");
+      const summaryText = summary?.textContent || "Details";
+      content += `<details>\n<summary>${summaryText}</summary>\n\n`;
+      const detailsContent = (node as HTMLElement).cloneNode(true) as HTMLElement;
+      detailsContent.querySelector("summary")?.remove();
+      content += detailsContent.textContent || "";
+      if (!content.endsWith("\n")) content += "\n";
+      content += "\n</details>\n";
     } else {
       node.childNodes.forEach(processNode);
     }
@@ -65,33 +108,170 @@ function htmlToMarkdown(element: HTMLElement): string {
 function markdownToHtml(markdown: string): string {
   if (!markdown) return "";
 
-  let html = markdown;
+  const lines = markdown.split("\n");
+  const result: string[] = [];
+  let inCodeBlock = false;
+  let codeBlockContent: string[] = [];
+  let inList = false;
+  let listType: "ul" | "ol" | null = null;
+  let listItems: string[] = [];
+  let inDetails = false;
+  let detailsSummary = "";
+  let detailsContent: string[] = [];
 
-  // Images: ![alt](url)
-  html = html.replace(
-    /!\[([^\]]*)\]\(([^)]+)\)/g,
-    '<img src="$2" alt="$1" class="inline-image" />'
-  );
+  const flushList = () => {
+    if (inList && listItems.length > 0) {
+      const tag = listType === "ol" ? "ol" : "ul";
+      result.push(`<${tag} class="markdown-list">${listItems.map((item) => `<li>${item}</li>`).join("")}</${tag}>`);
+      listItems = [];
+      inList = false;
+      listType = null;
+    }
+  };
 
-  // Links: [text](url)
-  html = html.replace(
-    /\[([^\]]+)\]\(([^)]+)\)/g,
-    '<a href="$2" target="_blank" rel="noopener noreferrer" class="inline-link">$1</a>'
-  );
+  const flushDetails = () => {
+    if (inDetails) {
+      result.push(`<details class="markdown-details"><summary class="markdown-summary">${detailsSummary}</summary><div class="markdown-details-content">${detailsContent.join("<br />")}</div></details>`);
+      detailsSummary = "";
+      detailsContent = [];
+      inDetails = false;
+    }
+  };
 
-  // Bold: **text**
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const processInline = (text: string): string => {
+    let processed = text;
 
-  // Italic: _text_
-  html = html.replace(/_(.+?)_/g, "<em>$1</em>");
+    processed = processed.replace(
+      /!\[([^\]]*)\]\(([^)]+)\)/g,
+      '<img src="$2" alt="$1" class="inline-image" />'
+    );
 
-  // Code: `text`
-  html = html.replace(/`(.+?)`/g, "<code>$1</code>");
+    processed = processed.replace(
+      /\[([^\]]+)\]\(([^)]+)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer" class="inline-link">$1</a>'
+    );
 
-  // Line breaks
-  html = html.replace(/\n/g, "<br />");
+    processed = processed.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    processed = processed.replace(/__(.+?)__/g, "<strong>$1</strong>");
+    processed = processed.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+    processed = processed.replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, "<em>$1</em>");
+    processed = processed.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
 
-  return html;
+    return processed;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (line.startsWith("```")) {
+      if (inCodeBlock) {
+        const codeHtml = `<pre class="code-block"><code>${codeBlockContent.join("\n")}</code></pre>`;
+        if (inDetails) {
+          detailsContent.push(codeHtml);
+        } else {
+          result.push(codeHtml);
+        }
+        codeBlockContent = [];
+        inCodeBlock = false;
+      } else {
+        flushList();
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeBlockContent.push(line.replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+      continue;
+    }
+
+    if (line === "<details>" || line.match(/^<details\s*>$/i)) {
+      flushList();
+      flushDetails();
+      inDetails = true;
+      continue;
+    }
+
+    if (inDetails && line.match(/^<summary>(.+)<\/summary>$/i)) {
+      const match = line.match(/^<summary>(.+)<\/summary>$/i);
+      detailsSummary = match ? processInline(match[1]) : "Details";
+      continue;
+    }
+
+    if (line === "</details>" || line.match(/^<\/details\s*>$/i)) {
+      flushDetails();
+      continue;
+    }
+
+    if (inDetails) {
+      if (line.trim() === "") {
+        detailsContent.push("<br />");
+      } else {
+        detailsContent.push(processInline(line));
+      }
+      continue;
+    }
+
+    if (line.match(/^#{1,6}\s/)) {
+      flushList();
+      const match = line.match(/^(#{1,6})\s+(.*)$/);
+      if (match) {
+        const level = match[1].length;
+        const content = processInline(match[2]);
+        result.push(`<h${level} class="markdown-h${level}">${content}</h${level}>`);
+      }
+      continue;
+    }
+
+    if (line.match(/^[-*]\s/)) {
+      if (!inList || listType !== "ul") {
+        flushList();
+        inList = true;
+        listType = "ul";
+      }
+      listItems.push(processInline(line.replace(/^[-*]\s/, "")));
+      continue;
+    }
+
+    if (line.match(/^\d+\.\s/)) {
+      if (!inList || listType !== "ol") {
+        flushList();
+        inList = true;
+        listType = "ol";
+      }
+      listItems.push(processInline(line.replace(/^\d+\.\s/, "")));
+      continue;
+    }
+
+    if (line.startsWith("> ")) {
+      flushList();
+      result.push(`<blockquote class="markdown-blockquote">${processInline(line.slice(2))}</blockquote>`);
+      continue;
+    }
+
+    if (line.match(/^[-*_]{3,}$/)) {
+      flushList();
+      result.push('<hr class="markdown-hr" />');
+      continue;
+    }
+
+    flushList();
+
+    if (line.trim() === "") {
+      result.push("<br />");
+    } else {
+      result.push(processInline(line));
+    }
+  }
+
+  flushList();
+  flushDetails();
+
+  if (inCodeBlock && codeBlockContent.length > 0) {
+    result.push(`<pre class="code-block"><code>${codeBlockContent.join("\n")}</code></pre>`);
+  }
+
+  return result.join("<br />");
 }
 
 // ============================================
@@ -216,6 +396,89 @@ export function RichEditor({
     }
   }, [onTextSelect]);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!editorRef.current) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      const range = sel.getRangeAt(0);
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          const node = range.startContainer;
+          if (node.nodeType === Node.TEXT_NODE && node.textContent) {
+            const text = node.textContent;
+            const lineStart = text.lastIndexOf("\n", range.startOffset - 1) + 1;
+            const linePrefix = text.slice(lineStart, range.startOffset);
+            if (linePrefix.startsWith("  ") || linePrefix.startsWith("\t")) {
+              const removeCount = linePrefix.startsWith("\t") ? 1 : 2;
+              node.textContent = text.slice(0, lineStart) + text.slice(lineStart + removeCount);
+              range.setStart(node, Math.max(lineStart, range.startOffset - removeCount));
+              range.collapse(true);
+              sel.removeAllRanges();
+              sel.addRange(range);
+              handleInput();
+            }
+          }
+        } else {
+          const indent = document.createTextNode("  ");
+          range.deleteContents();
+          range.insertNode(indent);
+          range.setStartAfter(indent);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          handleInput();
+        }
+        return;
+      }
+
+      if (e.key === "Enter" && !e.shiftKey) {
+        const node = range.startContainer;
+        if (node.nodeType !== Node.TEXT_NODE || !node.textContent) return;
+        
+        const text = node.textContent;
+        const lineStart = text.lastIndexOf("\n", range.startOffset - 1) + 1;
+        const currentLine = text.slice(lineStart, range.startOffset);
+        
+        const unorderedListMatch = currentLine.match(/^(\s*)([-*])\s/);
+        const orderedListMatch = currentLine.match(/^(\s*)(\d+)\.\s/);
+        
+        if (!unorderedListMatch && !orderedListMatch) return;
+        
+        const lineContent = currentLine.replace(/^\s*[-*]\s|^\s*\d+\.\s/, "").trim();
+        
+        if (!lineContent) {
+          e.preventDefault();
+          node.textContent = text.slice(0, lineStart) + "\n" + text.slice(range.startOffset);
+          range.setStart(node, lineStart + 1);
+          range.collapse(true);
+          sel.removeAllRanges();
+          sel.addRange(range);
+          handleInput();
+          return;
+        }
+        
+        e.preventDefault();
+        let nextListPrefix = "";
+        if (unorderedListMatch) {
+          nextListPrefix = `${unorderedListMatch[1]}${unorderedListMatch[2]} `;
+        } else if (orderedListMatch) {
+          nextListPrefix = `${orderedListMatch[1]}${parseInt(orderedListMatch[2]) + 1}. `;
+        }
+        
+        node.textContent = text.slice(0, range.startOffset) + "\n" + nextListPrefix + text.slice(range.startOffset);
+        range.setStart(node, range.startOffset + 1 + nextListPrefix.length);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        handleInput();
+      }
+    },
+    [handleInput]
+  );
+
   // Public method to insert image
   const insertImage = useCallback(
     (url: string, alt?: string) => {
@@ -309,7 +572,21 @@ export function RichEditor({
         "empty:before:content-[attr(data-placeholder)] empty:before:text-white/20",
         "[&_.inline-image]:max-w-full [&_.inline-image]:max-h-[300px] [&_.inline-image]:rounded-lg [&_.inline-image]:border [&_.inline-image]:border-white/[0.08] [&_.inline-image]:inline-block [&_.inline-image]:my-2 [&_.inline-image]:cursor-pointer",
         "[&_.inline-link]:text-blue-400 [&_.inline-link]:hover:text-blue-300 [&_.inline-link]:underline",
+        "[&_.inline-code]:px-1.5 [&_.inline-code]:py-0.5 [&_.inline-code]:bg-white/[0.08] [&_.inline-code]:rounded [&_.inline-code]:text-[14px] [&_.inline-code]:text-violet-300 [&_.inline-code]:font-mono",
         "[&_code]:px-1.5 [&_code]:py-0.5 [&_code]:bg-white/[0.08] [&_code]:rounded [&_code]:text-[14px] [&_code]:text-violet-300 [&_code]:font-mono",
+        "[&_.code-block]:block [&_.code-block]:p-4 [&_.code-block]:my-3 [&_.code-block]:bg-black/40 [&_.code-block]:rounded-lg [&_.code-block]:border [&_.code-block]:border-white/[0.08] [&_.code-block]:overflow-x-auto [&_.code-block]:whitespace-pre",
+        "[&_.markdown-h1]:text-3xl [&_.markdown-h1]:font-bold [&_.markdown-h1]:mt-6 [&_.markdown-h1]:mb-4 [&_.markdown-h1]:text-white",
+        "[&_.markdown-h2]:text-2xl [&_.markdown-h2]:font-bold [&_.markdown-h2]:mt-5 [&_.markdown-h2]:mb-3 [&_.markdown-h2]:text-white",
+        "[&_.markdown-h3]:text-xl [&_.markdown-h3]:font-semibold [&_.markdown-h3]:mt-4 [&_.markdown-h3]:mb-2 [&_.markdown-h3]:text-white/95",
+        "[&_.markdown-h4]:text-lg [&_.markdown-h4]:font-semibold [&_.markdown-h4]:mt-3 [&_.markdown-h4]:mb-2 [&_.markdown-h4]:text-white/90",
+        "[&_.markdown-h5]:text-base [&_.markdown-h5]:font-medium [&_.markdown-h5]:mt-2 [&_.markdown-h5]:mb-1 [&_.markdown-h5]:text-white/85",
+        "[&_.markdown-h6]:text-sm [&_.markdown-h6]:font-medium [&_.markdown-h6]:mt-2 [&_.markdown-h6]:mb-1 [&_.markdown-h6]:text-white/80",
+        "[&_.markdown-list]:my-2 [&_.markdown-list]:pl-6",
+        "[&_.markdown-list_li]:my-1",
+        "[&_ul.markdown-list]:list-disc",
+        "[&_ol.markdown-list]:list-decimal",
+        "[&_.markdown-blockquote]:pl-4 [&_.markdown-blockquote]:border-l-2 [&_.markdown-blockquote]:border-white/20 [&_.markdown-blockquote]:text-white/60 [&_.markdown-blockquote]:italic [&_.markdown-blockquote]:my-3",
+        "[&_.markdown-hr]:border-0 [&_.markdown-hr]:h-px [&_.markdown-hr]:bg-white/10 [&_.markdown-hr]:my-6",
         className
       )}
       style={{ wordBreak: "break-word" }}
@@ -318,6 +595,7 @@ export function RichEditor({
       onPaste={handlePaste}
       onMouseUp={handleSelection}
       onKeyUp={handleSelection}
+      onKeyDown={handleKeyDown}
     />
   );
 }

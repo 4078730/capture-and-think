@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { z } from "zod";
 
 const bulkArchiveSchema = z.object({
@@ -8,12 +9,8 @@ const bulkArchiveSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -23,17 +20,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
     }
 
-    const { error } = await supabase
-      .from("items")
-      .update({ status: "archived" })
-      .eq("user_id", user.id)
-      .in("id", parsed.data.item_ids);
+    const { success } = await nbAdapter.bulkArchive(parsed.data.item_ids);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ archived: parsed.data.item_ids.length });
+    return NextResponse.json({ archived: success });
   } catch (error) {
     console.error("POST /api/bulk-archive error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

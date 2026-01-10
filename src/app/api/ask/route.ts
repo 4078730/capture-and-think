@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { askQuestion } from "@/lib/ai/ask";
 import { z } from "zod";
 
@@ -10,12 +11,8 @@ const askSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -27,28 +24,14 @@ export async function POST(request: NextRequest) {
 
     const { query, bucket } = parsed.data;
 
-    // まず全アイテムを取得（最新20件）
-    let searchQuery = supabase
-      .from("items")
-      .select("*")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(20);
-
-    if (bucket) {
-      searchQuery = searchQuery.eq("bucket", bucket);
-    }
-
-    const { data: items, error } = await searchQuery;
+    const { items } = await nbAdapter.list({
+      status: "active",
+      bucket: bucket as any,
+      limit: 20,
+    });
 
     console.log(`Ask: found ${items?.length ?? 0} items for query: ${query}`);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Generate answer using AI
     const result = await askQuestion(query, items ?? []);
 
     return NextResponse.json(result);

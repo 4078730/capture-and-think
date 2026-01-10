@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PenLine, Inbox, MessageCircle, Sparkles, Settings, Brain } from "lucide-react";
+import { PenLine, Inbox, MessageCircle, Sparkles, Settings, CheckSquare } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
@@ -12,10 +12,10 @@ interface ReviewCountResponse {
 
 const navItems = [
   { href: "/", label: "Capture", icon: PenLine },
+  { href: "/tasks", label: "Tasks", icon: CheckSquare },
   { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/ask", label: "Ask AI", icon: MessageCircle },
   { href: "/review", label: "Review", icon: Sparkles },
-  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function Navigation() {

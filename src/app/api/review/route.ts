@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -16,22 +13,11 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "50");
     const offset = parseInt(searchParams.get("offset") || "0");
 
-    // Get items awaiting approval
-    const { data: items, error, count } = await supabase
-      .from("items")
-      .select("*", { count: "exact" })
-      .eq("user_id", user.id)
-      .eq("triage_state", "awaiting_approval")
-      .order("created_at", { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const result = await nbAdapter.getAwaitingApproval({ limit, offset });
 
     return NextResponse.json({
-      items: items || [],
-      total: count || 0,
+      items: result.items || [],
+      total: result.total || 0,
       limit,
       offset,
     });

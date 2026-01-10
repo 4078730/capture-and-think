@@ -28,6 +28,8 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_GIT_COMMIT_MESSAGE: gitCommitMessage || "No commit message",
     NEXT_PUBLIC_GIT_COMMIT_DATE: gitCommitDate,
     NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
+    NEXT_PUBLIC_SINGLE_USER_MODE: process.env.SINGLE_USER_MODE || "false",
+    NEXT_PUBLIC_AUTH_REQUIRED: process.env.NB_AUTH_USER && process.env.NB_AUTH_PASS ? "true" : "false",
   },
 };
 

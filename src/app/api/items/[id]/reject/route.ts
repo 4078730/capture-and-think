@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 
 export async function POST(
   request: NextRequest,
@@ -7,24 +8,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the item
-    const { data: item, error: fetchError } = await supabase
-      .from("items")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (fetchError || !item) {
+    const item = await nbAdapter.get(id);
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
@@ -35,26 +25,9 @@ export async function POST(
       );
     }
 
-    // Mark as done without applying AI suggestions
-    // Keep original values, clear AI suggestions
-    const { error: updateError } = await supabase
-      .from("items")
-      .update({
-        triage_state: "done",
-        triaged_at: new Date().toISOString(),
-        // Clear AI suggestions
-        ai_suggested_bucket: null,
-        ai_suggested_category: null,
-        ai_suggested_kind: null,
-        ai_suggested_summary: null,
-        ai_suggested_tags: [],
-        ai_confidence: null,
-      })
-      .eq("id", id);
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
+    await nbAdapter.update(id, {
+      triage_state: "done",
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

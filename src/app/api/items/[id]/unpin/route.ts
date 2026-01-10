@@ -1,34 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { checkAuth } from "@/lib/nb/auth";
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const authResult = checkAuth(request);
+    if (!authResult.authenticated) {
+      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
-    const supabase = await createClient();
+    const item = await nbAdapter.unpin(id);
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .update({ pinned: false })
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .select("id, pinned")
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json(data);
+    return NextResponse.json({ id: item.id, pinned: item.pinned });
   } catch (error) {
     console.error("POST /api/items/[id]/unpin error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

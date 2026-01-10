@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
+
+const DEFAULT_BUCKETS = [
+  "management",
+  "rfa",
+  "cxc",
+  "paper",
+  "video",
+  "life",
+  "game",
+];
 
 export async function GET(request: NextRequest) {
   const auth = await authenticateMCPRequest(request);
@@ -9,48 +19,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createServiceClient();
+    const { items } = await nbAdapter.list({ status: "active", limit: 1000 });
 
-    // Get distinct buckets with count
-    const { data, error } = await supabase
-      .from("items")
-      .select("bucket")
-      .eq("user_id", auth.userId!)
-      .eq("status", "active")
-      .not("bucket", "is", null);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    // Aggregate counts
     const bucketCounts: Record<string, number> = {};
-    for (const item of data ?? []) {
+    for (const item of items) {
       if (item.bucket) {
         bucketCounts[item.bucket] = (bucketCounts[item.bucket] || 0) + 1;
       }
     }
 
-    // Default buckets
-    const defaultBuckets = [
-      "management",
-      "rfa",
-      "cxc",
-      "paper",
-      "video",
-      "life",
-      "game",
-    ];
-
-    const buckets = defaultBuckets.map((bucket) => ({
+    const buckets = DEFAULT_BUCKETS.map((bucket) => ({
       id: bucket,
       label: bucket.charAt(0).toUpperCase() + bucket.slice(1),
       count: bucketCounts[bucket] || 0,
     }));
 
-    // Add buckets that exist in data but not in default list
     for (const [bucket, count] of Object.entries(bucketCounts)) {
-      if (!defaultBuckets.includes(bucket)) {
+      if (!DEFAULT_BUCKETS.includes(bucket)) {
         buckets.push({
           id: bucket,
           label: bucket.charAt(0).toUpperCase() + bucket.slice(1),
@@ -67,4 +52,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

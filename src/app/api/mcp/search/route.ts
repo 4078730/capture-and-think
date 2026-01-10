@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
 
-// GET - Search items
 export async function GET(request: NextRequest) {
   const auth = await authenticateMCPRequest(request);
   if (!auth.authenticated) {
@@ -10,9 +9,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = await createServiceClient();
     const { searchParams } = new URL(request.url);
-
     const q = searchParams.get("q");
     const limit = parseInt(searchParams.get("limit") ?? "20");
 
@@ -20,20 +17,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Query parameter 'q' is required" }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .select("id, body, bucket, category, kind, summary, pinned, due_date, created_at, status")
-      .eq("user_id", auth.userId!)
-      .or(`body.ilike.%${q}%,summary.ilike.%${q}%,memo.ilike.%${q}%`)
-      .order("created_at", { ascending: false })
-      .limit(limit);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const items = await nbAdapter.search(q);
+    const limitedItems = items.slice(0, limit);
 
     return NextResponse.json({
-      items: data ?? [],
+      items: limitedItems,
       query: q,
     });
   } catch (error) {

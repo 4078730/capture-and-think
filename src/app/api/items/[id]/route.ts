@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { checkAuth } from "@/lib/nb/auth";
 import { z } from "zod";
 
 const subtaskSchema = z.object({
@@ -31,28 +32,19 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authResult = checkAuth(request);
+    if (!authResult.authenticated) {
+      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
+    const { id } = await params;
+    const item = await nbAdapter.get(id);
 
-    if (error) {
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(item);
   } catch (error) {
     console.error("GET /api/items/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -64,35 +56,26 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const authResult = checkAuth(request);
+    if (!authResult.authenticated) {
+      return NextResponse.json({ error: authResult.error || "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const json = await request.json();
     const parsed = updateItemSchema.safeParse(json);
+
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .update(parsed.data)
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .select()
-      .single();
+    const item = await nbAdapter.update(id, parsed.data as any);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(item);
   } catch (error) {
     console.error("PATCH /api/items/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

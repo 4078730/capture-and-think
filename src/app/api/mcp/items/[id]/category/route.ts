@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { z } from "zod";
 
 const setCategorySchema = z.object({
@@ -18,7 +18,6 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
 
     const json = await request.json();
     const parsed = setCategorySchema.safeParse(json);
@@ -26,26 +25,15 @@ export async function POST(
       return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .update({ category: parsed.data.category })
-      .eq("id", id)
-      .eq("user_id", auth.userId!)
-      .select("id, category")
-      .single();
+    const item = await nbAdapter.update(id, { category: parsed.data.category });
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (!data) {
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ id: item.id, category: item.category });
   } catch (error) {
     console.error("MCP POST /items/[id]/category error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

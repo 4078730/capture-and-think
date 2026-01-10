@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
 import Anthropic from "@anthropic-ai/sdk";
 
 const anthropic = new Anthropic();
@@ -18,8 +18,8 @@ type ContentBlock =
 interface EnrichRequest {
   text?: string;
   url?: string;
-  image?: string; // base64 encoded image
-  imageType?: string; // mime type like "image/png"
+  image?: string;
+  imageType?: string;
 }
 
 interface EnrichResponse {
@@ -31,7 +31,6 @@ interface EnrichResponse {
   references: string[];
 }
 
-// Fetch URL content
 async function fetchUrlContent(url: string): Promise<string> {
   try {
     const response = await fetch(url, {
@@ -47,16 +46,14 @@ async function fetchUrlContent(url: string): Promise<string> {
     const contentType = response.headers.get("content-type") || "";
     const text = await response.text();
 
-    // Extract text content from HTML
     if (contentType.includes("text/html")) {
-      // Simple HTML to text extraction
       const textContent = text
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
         .replace(/<[^>]+>/g, " ")
         .replace(/\s+/g, " ")
         .trim();
-      return textContent.slice(0, 10000); // Limit content length
+      return textContent.slice(0, 10000);
     }
 
     return text.slice(0, 10000);
@@ -66,15 +63,12 @@ async function fetchUrlContent(url: string): Promise<string> {
   }
 }
 
-// Detect URLs in text
 function extractUrls(text: string): string[] {
   const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/gi;
   return text.match(urlRegex) || [];
 }
 
-// Parse base64 image data and extract media type
 function parseBase64Image(image: string, declaredType?: string): { data: string; mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" } | null {
-  // Check if it's a data URL
   const dataUrlMatch = image.match(/^data:(image\/(jpeg|png|gif|webp));base64,(.+)$/);
   if (dataUrlMatch) {
     return {
@@ -83,32 +77,18 @@ function parseBase64Image(image: string, declaredType?: string): { data: string;
     };
   }
 
-  // If it's raw base64, try to detect from magic bytes
-  let cleanBase64 = image;
-  // Remove any whitespace
-  cleanBase64 = cleanBase64.replace(/\s/g, "");
-
-  // Detect image type from base64 magic bytes
+  let cleanBase64 = image.replace(/\s/g, "");
   let detectedType: "image/jpeg" | "image/png" | "image/gif" | "image/webp" = "image/png";
 
-  // JPEG starts with /9j/
   if (cleanBase64.startsWith("/9j/")) {
     detectedType = "image/jpeg";
-  }
-  // PNG starts with iVBORw0KGgo
-  else if (cleanBase64.startsWith("iVBORw0KGgo")) {
+  } else if (cleanBase64.startsWith("iVBORw0KGgo")) {
     detectedType = "image/png";
-  }
-  // GIF starts with R0lGOD
-  else if (cleanBase64.startsWith("R0lGOD")) {
+  } else if (cleanBase64.startsWith("R0lGOD")) {
     detectedType = "image/gif";
-  }
-  // WebP starts with UklGR
-  else if (cleanBase64.startsWith("UklGR")) {
+  } else if (cleanBase64.startsWith("UklGR")) {
     detectedType = "image/webp";
-  }
-  // Fall back to declared type if valid
-  else if (declaredType && ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(declaredType)) {
+  } else if (declaredType && ["image/jpeg", "image/png", "image/gif", "image/webp"].includes(declaredType)) {
     detectedType = declaredType as "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   }
 
@@ -120,12 +100,8 @@ function parseBase64Image(image: string, declaredType?: string): { data: string;
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -138,10 +114,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Build messages for Claude
     const contentParts: ContentBlock[] = [];
 
-    // Add context about what we want
     let contextText = `あなたはメモ・タスク管理アシスタントです。ユーザーが提供した情報から、整理されたタスクやメモを作成してください。
 
 ## 出力形式（JSON）
@@ -157,7 +131,6 @@ export async function POST(request: NextRequest) {
 ## 入力情報
 `;
 
-    // Process URL if provided
     let urlContent = "";
     if (url) {
       try {
@@ -168,31 +141,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Extract URLs from text
     if (text) {
       const extractedUrls = extractUrls(text);
       contextText += `\n### ユーザー入力テキスト:\n${text}\n`;
 
-      // Fetch content from extracted URLs
       for (const extractedUrl of extractedUrls.slice(0, 3)) {
         if (extractedUrl !== url) {
           try {
             const content = await fetchUrlContent(extractedUrl);
             contextText += `\n### 参照URL: ${extractedUrl}\n${content.slice(0, 2000)}\n`;
           } catch {
-            // Ignore fetch errors for extracted URLs
           }
         }
       }
     }
 
-    // Add text content
     contentParts.push({
       type: "text",
       text: contextText,
     });
 
-    // Add image if provided
     if (image) {
       const parsedImage = parseBase64Image(image, imageType);
       if (parsedImage) {
@@ -211,7 +179,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Call Claude
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
@@ -223,11 +190,9 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    // Parse response
     const responseText =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Extract JSON from response
     const jsonMatch = responseText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json(

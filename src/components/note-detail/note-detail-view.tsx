@@ -21,7 +21,7 @@ import { cn } from "@/lib/utils";
 import type { Item, Subtask, Bucket } from "@/types";
 import type { ADFDocument } from "@/lib/adf";
 import { adfToPlainText, plainTextToADF } from "@/lib/adf";
-import { RichEditor, MediaToolbar, SelectionToolbar } from "@/components/rich-editor";
+import { PlateEditor, MediaToolbar, SelectionToolbar } from "@/components/rich-editor";
 
 // ============================================
 // Task Item Component
@@ -329,156 +329,6 @@ export function NoteDetailView({
       <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/[0.01] to-transparent pointer-events-none" />
 
       <div className="relative h-full flex w-full min-w-0 z-10">
-        {/* Sidebar */}
-        <aside
-          onClick={onClose}
-          className="w-72 border-r border-white/[0.04] p-5 hidden lg:flex flex-col bg-black/20 cursor-pointer"
-        >
-          {/* Back button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            className="flex items-center gap-3 px-4 py-3 -mx-2 mb-6 text-[14px] text-white/50 hover:text-white hover:bg-white/[0.05] rounded-xl transition-all group"
-          >
-            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-            <span className="font-medium">Back to list</span>
-          </button>
-
-          <div className="space-y-6" onClick={(e) => e.stopPropagation()}>
-            {/* Properties */}
-            <div>
-              <p className="text-[11px] font-medium text-white/30 uppercase tracking-widest mb-3">
-                Properties
-              </p>
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-[13px] text-white/40">Bucket</span>
-                  <span className="text-[13px] text-white/70 capitalize bg-white/[0.04] px-2 py-0.5 rounded">
-                    {item.bucket || "none"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-[13px] text-white/40">Kind</span>
-                  <span className="text-[13px] text-white/70 capitalize bg-white/[0.04] px-2 py-0.5 rounded">
-                    {item.kind}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1.5">
-                  <span className="text-[13px] text-white/40">Updated</span>
-                  <span className="text-[13px] text-white/70">
-                    {new Date(item.updated_at).toLocaleDateString("ja-JP")}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tags */}
-            {item.auto_tags.length > 0 && (
-              <div>
-                <p className="text-[11px] font-medium text-white/30 uppercase tracking-widest mb-3">
-                  Tags
-                </p>
-                <div className="flex flex-wrap gap-1.5">
-                  {item.auto_tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2.5 py-1 bg-white/[0.04] text-white/50 text-[11px] rounded-lg border border-white/[0.04]"
-                    >
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Subtasks */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-[11px] font-medium text-white/30 uppercase tracking-widest">
-                  Tasks
-                </p>
-                <span className="text-[10px] text-white/20 bg-white/[0.04] px-1.5 py-0.5 rounded">
-                  {subtasks.filter((t) => !t.completed).length} / {subtasks.length}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {subtasks
-                  .filter((t) => !t.completed)
-                  .map((task) => (
-                    <div
-                      key={task.id}
-                      className="p-2.5 -mx-1 rounded-lg bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.04] transition-all group cursor-pointer"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggleSubtask(task.id);
-                      }}
-                    >
-                      <div className="flex items-start gap-2.5">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleSubtask(task.id);
-                          }}
-                          className="mt-0.5 w-[16px] h-[16px] rounded-md border-2 border-white/15 hover:border-violet-400 transition-all flex-shrink-0 flex items-center justify-center"
-                        >
-                          <Check className="w-2 h-2 text-violet-400 opacity-0 group-hover:opacity-50 transition-opacity" />
-                        </button>
-                        <p className="text-[12px] text-white/70 leading-snug flex-1">
-                          {task.text}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-
-                {/* Completed tasks */}
-                {subtasks.filter((t) => t.completed).length > 0 && (
-                  <div className="pt-2 mt-2 border-t border-white/[0.04]">
-                    <p className="text-[9px] text-white/20 mb-1.5 uppercase">Completed</p>
-                    {subtasks
-                      .filter((t) => t.completed)
-                      .map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-center gap-2 py-1.5 px-1 -mx-1 rounded hover:bg-white/[0.02] transition-all cursor-pointer"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleSubtask(task.id);
-                          }}
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleSubtask(task.id);
-                            }}
-                            className="w-[14px] h-[14px] rounded bg-violet-500/20 border border-violet-500/30 flex items-center justify-center"
-                          >
-                            <Check className="w-2 h-2 text-violet-400" strokeWidth={3} />
-                          </button>
-                          <span className="text-[11px] text-white/25 line-through flex-1">
-                            {task.text}
-                          </span>
-                        </div>
-                      ))}
-                  </div>
-                )}
-
-                {subtasks.length === 0 && (
-                  <div className="text-center py-4">
-                    <p className="text-[11px] text-white/20 mb-1">タスクがありません</p>
-                    <p className="text-[10px] text-white/15">メインエディタ下部の「Add task」ボタンから追加できます</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1" />
-          <p className="text-[10px] text-white/15 text-center py-4">Click to return to list</p>
-        </aside>
-
         {/* Main Editor */}
         <main className="flex-1 flex flex-col min-w-0 bg-transparent">
           {/* Header */}
@@ -534,22 +384,26 @@ export function NoteDetailView({
 
             <div className="flex items-center gap-1">
               <button
+                onClick={() => onUpdate({ pinned: !item.pinned })}
                 className={cn(
                   "p-2 rounded-lg transition-all",
                   item.pinned
                     ? "text-amber-400 bg-amber-500/10"
                     : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
                 )}
+                title={item.pinned ? "Unpin" : "Pin"}
               >
                 <Pin className="w-4 h-4" />
               </button>
               <button
+                onClick={() => onUpdate({ status: item.status === "archived" ? "active" : "archived" })}
                 className={cn(
                   "p-2 rounded-lg transition-all",
                   item.status === "archived"
                     ? "text-violet-400 bg-violet-500/10"
                     : "text-white/30 hover:text-white/60 hover:bg-white/[0.04]"
                 )}
+                title={item.status === "archived" ? "Unarchive" : "Archive"}
               >
                 {item.status === "archived" ? (
                   <ArchiveRestore className="w-4 h-4" />
@@ -588,12 +442,61 @@ export function NoteDetailView({
             }}
           >
             <div className="max-w-5xl mx-auto px-8 lg:px-12 xl:px-16 py-12">
-              {/* Color indicator */}
-              <div className="flex items-center gap-3 mb-6" onClick={(e) => e.stopPropagation()}>
-                <div className={cn("w-3 h-3 rounded-full shadow-lg", color.dot, color.glow)} />
-                <span className="text-[11px] text-white/30 uppercase tracking-widest font-medium">
-                  {item.bucket || "inbox"}
-                </span>
+              {/* Properties bar */}
+              <div className="flex items-center gap-4 mb-6 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center gap-2">
+                  <div className={cn("w-3 h-3 rounded-full shadow-lg", color.dot, color.glow)} />
+                  <select
+                    value={item.bucket || ""}
+                    onChange={(e) => onUpdate({ bucket: (e.target.value || null) as Bucket | null })}
+                    className="text-[11px] text-white/30 uppercase tracking-widest font-medium bg-transparent hover:text-white/50 cursor-pointer outline-none border-none appearance-none pr-4"
+                    style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23666' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E\")", backgroundPosition: "right 0 center", backgroundRepeat: "no-repeat", backgroundSize: "16px" }}
+                  >
+                    <option value="">inbox</option>
+                    <option value="management">management</option>
+                    <option value="rfa">rfa</option>
+                    <option value="cxc">cxc</option>
+                    <option value="paper">paper</option>
+                    <option value="video">video</option>
+                    <option value="life">life</option>
+                    <option value="game">game</option>
+                  </select>
+                </div>
+                <div className="w-px h-4 bg-white/10" />
+                <button
+                  onClick={() => onUpdate({ pinned: !item.pinned })}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] transition-all",
+                    item.pinned
+                      ? "text-amber-400 bg-amber-500/10"
+                      : "text-white/30 hover:text-white/50 hover:bg-white/[0.04]"
+                  )}
+                >
+                  <Pin className="w-3 h-3" />
+                  {item.pinned ? "Pinned" : "Pin"}
+                </button>
+                <div className="flex items-center gap-1.5">
+                  <Calendar className="w-3 h-3 text-white/30" />
+                  <input
+                    type="date"
+                    value={item.due_date?.split("T")[0] || ""}
+                    onChange={(e) => onUpdate({ due_date: e.target.value || null })}
+                    placeholder="Due date"
+                    className="text-[11px] text-white/40 bg-transparent hover:text-white/60 cursor-pointer outline-none border-none [color-scheme:dark]"
+                  />
+                </div>
+                {item.auto_tags && item.auto_tags.length > 0 && (
+                  <>
+                    <div className="w-px h-4 bg-white/10" />
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {item.auto_tags.map((tag) => (
+                        <span key={tag} className="text-[10px] text-white/40 bg-white/[0.04] px-1.5 py-0.5 rounded">
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Title */}
@@ -612,7 +515,7 @@ export function NoteDetailView({
 
               {/* Rich Editor */}
               <div className="mt-8" onClick={(e) => e.stopPropagation()}>
-                <RichEditor
+                <PlateEditor
                   value={adfContent}
                   onChange={(newContent) => {
                     handleContentChange(newContent);

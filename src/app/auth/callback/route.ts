@@ -1,18 +1,24 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+const SINGLE_USER_MODE = process.env.SINGLE_USER_MODE === "true";
+
 export async function GET(request: Request) {
+  const origin = new URL(request.url).origin;
+
+  if (SINGLE_USER_MODE) {
+    return NextResponse.redirect(`${origin}/`);
+  }
+
   try {
-    // Validate environment variables
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       console.error("Missing Supabase environment variables");
-      const origin = new URL(request.url).origin;
       return NextResponse.redirect(
         `${origin}/auth/login?error=${encodeURIComponent("Server configuration error. Please contact support.")}`
       );
     }
 
-    const { searchParams, origin } = new URL(request.url);
+    const { searchParams } = new URL(request.url);
     const code = searchParams.get("code");
     const error_param = searchParams.get("error");
     const error_description = searchParams.get("error_description");

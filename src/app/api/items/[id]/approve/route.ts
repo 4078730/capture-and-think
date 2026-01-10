@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { checkAuth } from "@/lib/nb/auth";
+import { nbAdapter } from "@/lib/nb/adapter";
 import { z } from "zod";
-import type { Bucket, Kind } from "@/types";
+import type { Kind } from "@/types";
 
 const approveSchema = z.object({
-  // Optional overrides - user can modify AI suggestions before approving
   bucket: z.string().optional(),
   category: z.string().optional(),
   kind: z.enum(["idea", "task", "note", "reference", "unknown"]).optional(),
@@ -22,24 +22,13 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) {
+    const authResult = checkAuth();
+    if (!authResult.authenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get the item
-    const { data: item, error: fetchError } = await supabase
-      .from("items")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", user.id)
-      .single();
-
-    if (fetchError || !item) {
+    const item = await nbAdapter.get(id);
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
@@ -50,7 +39,6 @@ export async function POST(
       );
     }
 
-    // Parse optional overrides
     let overrides: ApproveOverrides = {};
     try {
       const json = await request.json();
@@ -59,27 +47,14 @@ export async function POST(
         overrides = parsed.data;
       }
     } catch {
-      // No body provided, that's fine
     }
 
-    // Apply AI suggestions (with optional overrides)
-    const { error: updateError } = await supabase
-      .from("items")
-      .update({
-        bucket: overrides.bucket ?? item.ai_suggested_bucket ?? item.bucket,
-        category: overrides.category ?? item.ai_suggested_category,
-        kind: overrides.kind ?? item.ai_suggested_kind ?? "unknown",
-        summary: item.ai_suggested_summary,
-        auto_tags: item.ai_suggested_tags ?? [],
-        confidence: item.ai_confidence ?? 0,
-        triage_state: "done",
-        triaged_at: new Date().toISOString(),
-      })
-      .eq("id", id);
-
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
+    await nbAdapter.update(id, {
+      bucket: (overrides.bucket ?? item.bucket) as any,
+      category: overrides.category ?? item.category,
+      kind: overrides.kind ?? item.kind ?? "unknown",
+      triage_state: "done",
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const SINGLE_USER_MODE = process.env.NEXT_PUBLIC_SINGLE_USER_MODE === "true";
+
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -13,13 +15,17 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // Show error from URL params (e.g., from OAuth callback)
   useEffect(() => {
+    if (SINGLE_USER_MODE) {
+      router.replace("/");
+      return;
+    }
+
     const error = searchParams.get("error");
     if (error) {
       setMessage(`エラー: ${error}`);
     }
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   const handlePasswordAuth = async (e: React.FormEvent) => {
     e.preventDefault();

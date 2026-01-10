@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
 
 export async function POST(
   request: NextRequest,
@@ -13,28 +13,15 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
+    const item = await nbAdapter.pin(id);
 
-    const { data, error } = await supabase
-      .from("items")
-      .update({ pinned: true })
-      .eq("id", id)
-      .eq("user_id", auth.userId!)
-      .select("id, pinned")
-      .single();
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (!data) {
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json({ id: item.id, pinned: item.pinned });
   } catch (error) {
     console.error("MCP POST /items/[id]/pin error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

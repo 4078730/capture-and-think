@@ -49,8 +49,8 @@ export function getBucketColor(bucket: string | null): string {
     rfa: "bg-blue-500",
     cxc: "bg-cyan-500",
     paper: "bg-yellow-500",
-    video: "bg-blue-500", // Videoは青
-    life: "bg-rose-500", // Lifeは赤紫
+    video: "bg-blue-500",
+    life: "bg-rose-500",
     game: "bg-orange-500",
   };
   return bucket ? colors[bucket] || "bg-gray-500" : "bg-gray-500";

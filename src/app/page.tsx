@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Plus, Search, Star, ChevronDown, Settings, ArrowUpDown, Calendar, Clock, Tag, Hash, Zap, Film, Heart, Gamepad2, Archive, Command, X, Folder, FileText, Briefcase, Check, Inbox, MessageCircle, Sparkles } from "lucide-react";
+import { Plus, Search, Star, ChevronDown, Settings, ArrowUpDown, Calendar, Clock, Tag, Hash, Zap, Film, Heart, Gamepad2, Archive, Command, X, Folder, FileText, Briefcase, Check, Inbox, MessageCircle, Sparkles, CheckSquare } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -480,6 +480,19 @@ export default function HomePage() {
           <div className="mt-6 pt-6 border-t border-white/[0.08]">
             <div className="space-y-1">
               <Link
+                href="/tasks"
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200",
+                  pathname === "/tasks"
+                    ? "bg-white/[0.08] text-white"
+                    : "text-white/40 hover:text-white/70 hover:bg-white/[0.03]"
+                )}
+                style={{ minHeight: "36px" }}
+              >
+                <CheckSquare className={cn("w-4 h-4 flex-shrink-0", pathname === "/tasks" ? "text-emerald-400" : "")} />
+                <span className="flex-1 text-left">Tasks</span>
+              </Link>
+              <Link
                 href="/inbox"
                 className={cn(
                   "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all duration-200",
@@ -586,9 +599,13 @@ export default function HomePage() {
                     type="button"
                     onClick={async () => {
                       try {
-                        // 空のメモを作成して詳細ビューを開く
+                        const todayDateStr = new Date().toLocaleDateString("ja-JP", {
+                          year: "numeric",
+                          month: "2-digit",
+                          day: "2-digit",
+                        }).replace(/\//g, "-");
                         const createdItem = await createItem.mutateAsync({
-                          body: "",
+                          body: `# ${todayDateStr}\n\n`,
                           bucket: bucket ?? undefined,
                         });
                         setSelectedItem(createdItem);

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/supabase/server";
-import { authenticateMCPRequest } from "@/lib/mcp-auth";
+import { nbAdapter } from "@/lib/nb/adapter";
+import { authenticateMCPRequest } from "@/lib/nb/mcp-auth";
 import { z } from "zod";
 
 const adfDocumentSchema = z.object({
@@ -27,7 +27,6 @@ const updateItemSchema = z.object({
   subtasks: z.array(subtaskSchema).optional(),
 });
 
-// GET - Get single item
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,27 +38,19 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
+    const item = await nbAdapter.get(id);
 
-    const { data, error } = await supabase
-      .from("items")
-      .select("*")
-      .eq("id", id)
-      .eq("user_id", auth.userId!)
-      .single();
-
-    if (error || !data) {
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(item);
   } catch (error) {
     console.error("MCP GET /items/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-// PATCH - Update item
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -71,38 +62,26 @@ export async function PATCH(
 
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
-
     const json = await request.json();
     const parsed = updateItemSchema.safeParse(json);
+
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.errors }, { status: 400 });
     }
 
-    const { data, error } = await supabase
-      .from("items")
-      .update(parsed.data)
-      .eq("id", id)
-      .eq("user_id", auth.userId!)
-      .select()
-      .single();
+    const item = await nbAdapter.update(id, parsed.data as any);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (!data) {
+    if (!item) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(item);
   } catch (error) {
     console.error("MCP PATCH /items/[id] error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-// DELETE - Archive item
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -114,19 +93,10 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    const supabase = await createServiceClient();
+    const item = await nbAdapter.archive(id);
 
-    const { error } = await supabase
-      .from("items")
-      .update({
-        status: "archived",
-        archived_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .eq("user_id", auth.userId!);
-
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!item) {
+      return NextResponse.json({ error: "Item not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });

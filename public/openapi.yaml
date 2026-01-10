@@ -1,0 +1,396 @@
+openapi: 3.1.0
+info:
+  title: Capture & Think API
+  description: Note-taking and task management API for LLM integrations (GPTs, Gems, Claude)
+  version: 1.0.0
+
+servers:
+  - url: https://your-domain.com
+    description: Production server
+
+security:
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: API key from MCP_API_KEY environment variable
+
+  schemas:
+    Item:
+      type: object
+      properties:
+        id:
+          type: string
+        body:
+          type: string
+        bucket:
+          type: string
+          enum: [management, rfa, cxc, paper, video, life, game]
+          nullable: true
+        pinned:
+          type: boolean
+        status:
+          type: string
+          enum: [active, archived]
+        category:
+          type: string
+          nullable: true
+        summary:
+          type: string
+          nullable: true
+        memo:
+          type: string
+          nullable: true
+        due_date:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        text:
+          type: string
+        completed:
+          type: boolean
+        lineIndex:
+          type: integer
+        itemId:
+          type: string
+        itemTitle:
+          type: string
+        itemBucket:
+          type: string
+          nullable: true
+
+    TaskGroup:
+      type: object
+      properties:
+        bucket:
+          type: string
+          nullable: true
+        bucketLabel:
+          type: string
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        completedCount:
+          type: integer
+        totalCount:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+paths:
+  /api/mcp/items:
+    get:
+      operationId: listNotes
+      summary: List notes
+      description: Get a list of notes with optional filters
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, archived]
+            default: active
+        - name: bucket
+          in: query
+          schema:
+            type: string
+            enum: [management, rfa, cxc, paper, video, life, game]
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: pinned
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of notes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Item'
+                  total:
+                    type: integer
+                  limit:
+                    type: integer
+                  offset:
+                    type: integer
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      operationId: createNote
+      summary: Create a new note
+      description: Create a new note with optional bucket and metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - body
+              properties:
+                body:
+                  type: string
+                  description: Note content (Markdown supported)
+                bucket:
+                  type: string
+                  enum: [management, rfa, cxc, paper, video, life, game]
+                memo:
+                  type: string
+                due_date:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Created note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/mcp/items/{id}:
+    get:
+      operationId: getNote
+      summary: Get a note by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Note details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    patch:
+      operationId: updateNote
+      summary: Update a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                body:
+                  type: string
+                bucket:
+                  type: string
+                  enum: [management, rfa, cxc, paper, video, life, game]
+                  nullable: true
+                pinned:
+                  type: boolean
+                memo:
+                  type: string
+                  nullable: true
+                due_date:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Updated note
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Item'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      operationId: archiveNote
+      summary: Archive a note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Note archived
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/mcp/search:
+    get:
+      operationId: searchNotes
+      summary: Search notes
+      description: Full-text search across note content
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Search query
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Item'
+                  query:
+                    type: string
+
+  /api/tasks:
+    get:
+      operationId: listTasks
+      summary: List all tasks grouped by bucket
+      description: Extract tasks (checkboxes) from all notes, grouped by bucket
+      parameters:
+        - name: includeCompleted
+          in: query
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Tasks grouped by bucket
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  groups:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TaskGroup'
+                  total:
+                    type: integer
+                  completed:
+                    type: integer
+
+  /api/tasks/toggle:
+    post:
+      operationId: toggleTask
+      summary: Toggle task completion
+      description: Toggle a task's completed status in the original note
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - itemId
+                - lineIndex
+              properties:
+                itemId:
+                  type: string
+                  description: ID of the note containing the task
+                lineIndex:
+                  type: integer
+                  description: Line number of the task in the note
+      responses:
+        '200':
+          description: Task toggled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  item:
+                    $ref: '#/components/schemas/Item'
+        '404':
+          description: Note not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
